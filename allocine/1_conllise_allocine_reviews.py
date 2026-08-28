@@ -1,6 +1,8 @@
+# -*- coding: utf-8 -*-
 import argparse
 import re
 import sys
+import json
 import math
 import pandas as pd
 from pathlib import Path
@@ -189,11 +191,18 @@ def run_main_pipe(source_file, chunk_size):
     
     try:
         # Step 1: Process raw data into the nested dictionary structure
-        print("Step 1/2: Transforming data and generating CoNLL strings...")
+        print("Step 1: Transforming data and generating CoNLL strings...")
         output_data = transform_data(source_file)
         
+
+        print("Step 2: Exporting key-url metas...")
+        meta_storage = {key: value['url'] for key, value in output_data.items()}
+        meta_output_file = source_file.replace('pickle','_key_url_metas.json')
+        with open(meta_output_file, 'w', encoding='UTF-8') as f:
+            json.dump(meta_storage, f, indent=2)
+
         # Step 2: Split that data into multiple files
-        print("Step 2/2: Writing data to files...")
+        print("Step 3: Writing data to files...")
         send_to_files(source_file, output_data, chunk_size=chunk_size)
         
         print("✅ Pipeline completed successfully!")
