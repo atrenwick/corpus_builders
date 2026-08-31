@@ -315,12 +315,6 @@ if __name__ == "__main__":
       final_consolidator(output_dir)
 
 
-#key_url_json_file =  '/Volumes/Kappa/test/allocinetest#/test_out/allocine_dataset_metas_output.json'
-#metadata_detail_file = '/Volumes/Kappa/test/allocinetest#/test_out/allocine_metasv2.xml'
-#xml_conll_file = '/Volumes/Kappa/test/allocinetest/test_out#/allocine_dataset_part05.__fr_OUTv2.xml'
-#output_dir = '/Volumes/Kappa/test/allocinetest/test_out/'
-#
-# get files
 
 
 
