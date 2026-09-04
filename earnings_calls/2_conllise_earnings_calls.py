@@ -14,20 +14,15 @@ from pathlib import Path
 
 from functools import partial
 from concurrent.futures import ProcessPoolExecutor, as_completed
-
 from typing import Dict, List, Tuple, Any, Optional
-
 
 
 # Pre-compile the regex for better performance
 SPEAKER_PATTERN = re.compile(r'^([A-Z][a-z]+ [A-Z][a-z]+)\s*:\s*')
 CONLL_LINETAIL = "\t_\t_\t_\t_\t_\t_\t_\t_\n"
 
-
 # Global NLP object to be initialized in each worker process
 _nlp = None
-
-
 
 def get_next_quarterdate(datafqrt: str) -> Tuple[str, str, str]:
     """Calculates the first day of the first month of the next fiscal quarter.
