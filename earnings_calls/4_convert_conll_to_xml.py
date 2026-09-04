@@ -340,7 +340,7 @@ def run_processing(source_dir: str, output_dir: str, nproc: int) -> List[AsyncRe
     file_list = generate_file_list(source_dir)
 
     # Step 2: create the pool
-    pool_size = define_poolsize(nproc: int, file_list: List[str])
+    pool_size = define_poolsize(nproc, file_list)
 
     ## make worker
     worker_func = partial(process_file, output_dir=output_dir)
