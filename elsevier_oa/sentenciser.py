@@ -1,7 +1,7 @@
 ## sentenciser consolidation
 # step1 : last item in p is EOS
 # general rule : if in EOS_list, == mark
-
+## TODO: multithread this, each thread can use a letter prepended to its own count
 import re
 import glob
 import os
