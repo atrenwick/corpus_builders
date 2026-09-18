@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
-from multiprocessing import Pool
 
 def make_file_names(
     tagged_file: Union[str, Path], 
