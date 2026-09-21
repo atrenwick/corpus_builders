@@ -137,6 +137,7 @@ def refactor_metas(json_file: Path) -> Tuple[str, Dict[str, str]]:
         "journal_issn": get_str('issn'),
         "article_subj": get_str('subjareas'),
         "issue": get_str('issue', "_"),
+        "doi": get_str('doi',"_"),
         "pageinfo": pageinfo,
         "number": get_str('number', "_"),
         "volume": get_str('volume', "_"),
