@@ -117,6 +117,13 @@ def refactor_metas(json_file: Path) -> Tuple[str, Dict[str, str]]:
     else:
         first_author = 'NA'
 
+    ## page info
+    try:
+        pageinfo  = f"p. {str(metadata['firstpage'])}-{str(metadata['lastpage'])}"
+    except Exception as e:
+        pageinfo = 'unknown pages'
+
+
     # Helper to get values and ensure they are strings
     def get_str(key: str, default: str = "NA") -> str:
         val = metadata.get(key, default)
@@ -130,6 +137,7 @@ def refactor_metas(json_file: Path) -> Tuple[str, Dict[str, str]]:
         "journal_issn": get_str('issn'),
         "article_subj": get_str('subjareas'),
         "issue": get_str('issue', "_"),
+        "pageinfo": pageinfo,
         "number": get_str('number', "_"),
         "volume": get_str('volume', "_"),
     }
@@ -326,7 +334,9 @@ def run_issn_querying(
     Returns:
         None
     """
-
+    
+    load_secrets()
+    
     success_dict: Dict[str, Any] = {}
     error_dict: Dict[str, Any] = {}
     
@@ -344,7 +354,7 @@ def run_issn_querying(
     else:
         these_issns = tidy_issns
 
-    print(f"Running queries on {len(these_issns)} issns with batch == {batch_size} and delay = {delay}")
+    print(f"Running queries on {len(these_issns)} issns with batch == {buffer} and delay = {delay}")
 
     for num, issn in tqdm(enumerate(these_issns, start=1), desc="Querying ISSNs"):
         result = process_one_issn(issn)
@@ -433,6 +443,7 @@ def main(
     if skip not in ("1", 1):
         # Standard flow: Generate dict from folder
         tidy_issns = make_dict(folder_with_jsons)
+    
     else:
         # Skip flow: Load from provided file
         try:
@@ -442,15 +453,16 @@ def main(
             print(f"Error loading ISSNs from file: {e}")
             raise
 
+    if skip not in (2,"2"):
     # Execute the query process
-    run_issn_querying(
-        folder_with_jsons=folder_with_jsons, 
-        tidy_issns=tidy_issns, 
-        delay=delay, 
-        qtest=qtest, 
-        number=number,
-        buffer=buffer
-    )
+        run_issn_querying(
+            folder_with_jsons=folder_with_jsons, 
+            tidy_issns=tidy_issns, 
+            delay=delay, 
+            qtest=qtest, 
+            number=number,
+            buffer=buffer
+        )
 
 
 
@@ -475,7 +487,7 @@ if __name__ == "__main__":
         "-s", "--skip", 
         type=str,
         default="0",
-        help="Skip flag (set to '1' to load from issn_infile instead of folder)"
+        help="Skip flag (set to '1' to skip reparsing of source JSONs and load from issn_infile instead of folder. Set to 2 to skip API querying.)"
     )
     parser.add_argument(
         "--q_test", 
@@ -495,13 +507,14 @@ if __name__ == "__main__":
         "--issn_infile", 
         type=str,
         required=False, 
+        default="",
         help="Path to existing file of issns"
     )
     parser.add_argument(
         "-b", "--buffer", 
         type=int,
         required=False, 
-        default=10
+        default=10,
         help="Number of results to hold in buffer"
     )
     
