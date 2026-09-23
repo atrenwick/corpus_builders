@@ -2,6 +2,12 @@
 
 This repository contains a pipeline to transform the **Elsevier OA-BY-CC dataset** (comprising over 40,000 documents) into a structured, tokenized, and sentencised XML corpus.
 
+### Source data and size:
+The Elsevier OA-BY-CC Corpus is available from [the official repo on DigitalCommons Data](https://elsevier.digitalcommonsdata.com/datasets/zm33cdndxs/3).
+The archive is ≈ 920 MB ; when uncompressed, the json source files are around 6.5 GB. The final corpus, with token level parses and XML structure is around 12 GB uncompressed.
+
+
+
 > [!IMPORTANT]
 > **Environment Recommendation:** It is highly recommended to run this in a fresh virtual environment (e.g., `elsevier_env`),
 
@@ -35,7 +41,7 @@ python 1_elsevier_mover.py --source /data/elsevier_oa/data_step0 --chunks 1000 -
 ---
 
 ### 2. `2_json_to_xml.py`
-**Purpose:** Transforms source JSON documents into TEI-compatible XML. It preserves the text body and hierarchical information (e.g., identifying "Introduction to exciting topic number 1" as a specific paragraph).
+**Purpose:** Transforms source JSON documents into TEI-compatible XML. It preserves the text body and hierarchical information.
 
 **Example Usage:**
 ```bash
@@ -47,15 +53,15 @@ python 2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_dir /
 ---
 
 ### 3. `3_tokeniser.py`
-**Purpose:** Performs tokenization on paragraphs, adding a `<w>` element with a unique ID for every token. It handles standard English boundaries (spaces/punctuation) and special cases like possessive apostrophes and Latin abbreviations.
+**Purpose:** Performs tokenization on paragraphs, adding a `<w>` element with a unique ID for every token. It handles 'standard' boundaries (spaces/punctuation) and special cases like possessive apostrophes and Latin abbreviations.
 
 **Example Usage:**
 ```bash
-python 3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --join_hyphen True --lang en
+python 3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --lang en
 ```
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
-*   `--nprocs`: Number of worker processes (limited by CPU cores and file count).
+*   `--nprocs`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--lang`: Language for rules (e.g., `en` for English).
 
 ---
@@ -69,11 +75,14 @@ python 3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /da
 
 **Example Usage:**
 ```bash
-python 4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --join_hyphen True --lang en
+python 4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --lang en --offset 314
 ```
-*   `--offset`: Starting number for sentence numbering (e.g., `--offset 314`).
+*   `--source_dir`: Path to folder containing tokenised XML files.
+*   `--output_dir`: Path to folder where sentencized XML files will be exported.
+*   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
+*   `--lang`: Language for rules (e.g., `en` for English).
 *   `--chunksize`: Number of files each worker should read in a single batch.
-
+*   `--offset`: Number from which sentences should be numbered
 ---
 
 ### 5. `5_reinsert.py`
@@ -85,6 +94,9 @@ python 5_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirnam
 ```
 *   `--conll_source`: Path to folder containing tagged CoNLL files.
 *   `--xml_dirname`: The *name* (not path) of the folder containing the sentencised XML.
+*   `--xml_output`: The *name* (not path) of the folder where files will be exported.
+*   `--id_attrib`: XML attribute of `<s>` elements containing sentence IDs : (eg `s_id`, `sID`, `id`, `send_id`...)
+*   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
 
 ---
@@ -109,15 +121,19 @@ python 7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay 30 
 ---
 
 ### 8. `8_update_trees.py`
-**Purpose:** Finalizes the XML. It injects the metadata gathered in Script 7 into new `<teiHeader>` elements and groups `<p>` tags into `<div type="...">` elements based on their shared categories.
+**Purpose:** Finalizes the individual XML files. It injects the metadata gathered in Script 7 into new `<teiHeader>` elements and groups `<p>` tags into `<div type="...">` elements based on their shared categories.
 
 **Example Usage:**
 ```bash
-python 8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /data/elsevier_oa/data_step6 --issn /data/elsevier_oa/data_step0/issn_success_titles.json -a /data/elsevier_oa/data_step0/metadata_dict.json --n_procs 7 --sibling --extension .xml
+python 8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /data/elsevier_oa/data_step6 --issn /data/elsevier_oa/data_step0/issn_success_titles.json --artmetas /data/elsevier_oa/data_step0/metadata_dict.json --n_procs 7 --sibling --extension .xml
 ```
+*   `--source`: Path to the folder of XML files to process.
+*   `--output`: Path to the folder where output XML files will be exported.
 *   `--issn`: Path to the ISSN-title-subject dictionary.
-*   `-a`: Path to the article-level metadata dictionary.
-
+*   `--artmetas`: Path to the article-level metadata dictionary.
+*   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
+*   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
+*   `--extension`: Process only files with this file extension (without leading `.`) 
 ---
 
 ## 🛠 Helper Scripts
