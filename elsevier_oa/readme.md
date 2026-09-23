@@ -4,7 +4,7 @@ This repository contains a pipeline to transform the **Elsevier OA-BY-CC dataset
 
 ### Source data and size:
 The Elsevier OA-BY-CC Corpus is available from [the official repo on DigitalCommons Data](https://elsevier.digitalcommonsdata.com/datasets/zm33cdndxs/3).
-The archive is ≈ 920 MB ; when uncompressed, the json source files are around 6.5 GB. The final corpus, with token level parses and XML structure is around 12 GB uncompressed.
+The archive is ≈ 970 MB ; when uncompressed, the json source files are around 6.5 GB. The final corpus, with token level parses and XML structure is around 12 GB uncompressed.
 
 
 
