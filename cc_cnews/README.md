@@ -26,6 +26,7 @@ python get_parquetfiles.py --year 2020 --repo foo/bar --local_dir /data/raw_parq
 *   `--repo`: The Hugging Face repository ID following the standard pattern of username/datasetname (here, user 'foo', dataset = 'bar').
 *   `--local_dir`: The absolute path to the local directory where the `.parquet` files will be saved.
 
+---
 
 ### 2. Data Extraction and ConLLU Conversion
 
@@ -59,7 +60,8 @@ python make_conll.py -year 2017 -filter_type domain -filter_value lemonde.fr --n
 *   `-local_dir`: Optional local directory override for data paths.
 
 
-    
+---
+
 ### 3. NLP Annotation and Dependency Parsing
 
 This script performs deep linguistic analysis on the processed CoNLLU files using the **Stanza** NLP library, adding POS tags, lemmas, and syntactic dependencies.
@@ -88,6 +90,8 @@ python parse_conll.py -lang fr -size 1.0
 *   `-size`: An integer or float used to define `mwt_batch_size`, `pos_batch_size`, `lemma_batch_size`, `depparse_batch_size` and  `depparse_second_batch_size`. The base batch size is calculated as `size * 1024` so specifying `1.0` will limit batch sizes to 1024. 
 *   `-depparseOnly`: If set to `T` or `True`, the script will only run the dependency parser. The input files must be well-formatted CoNLL with at least POS and LEM annotations already present.
 *   `--subf`: (Optional) Specifies a subfolder within `tag_input` to process. If left blank, the script scans the root `tag_input` directory for both `.conll` and `.conllu` files.
+
+---
 
 
 ### 4. ConLL to Article XML Conversion
