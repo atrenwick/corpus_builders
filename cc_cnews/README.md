@@ -1,10 +1,9 @@
-# cc_news
-Creating corpora from CC News dumps with a bit of py
-note:: Downloading can also be done with `huggingface_hub` , see https://huggingface.co/docs/huggingface_hub/en/guides/download.
+# cc_news: Creating corpora from CC News dumps 
+
 
 ### 1. Dataset Acquisition (HF Download)
 
-This script handles the initial data ingestion phase. It retrieves raw `.parquet` files from a specified Hugging Face dataset repository, filtering the results by a specific year to ensure only the relevant data is downloaded for the pipeline.
+This script handles the initial data ingestion phase. It retrieves raw `.parquet` files from a specified Hugging Face dataset repository, filtering the results by a specific year to ensure only the relevant data is downloaded for the pipeline. This is of course not the only way to get data from HF, it was just a test « can I make something to download what I want my way »
 
 #### Key Features:
 *   **Hugging Face Integration**: Connects directly to the HF Hub to list files and generate download URLs.
@@ -16,24 +15,17 @@ This script handles the initial data ingestion phase. It retrieves raw `.parquet
 > [!IMPORTANT]
 > This script requires a Hugging Face Access Token. Ensure you are authenticated on your machine by running `huggingface-cli login` or by setting the `HF_TOKEN` environment variable before execution.
 
+
 #### Example Usage:
 ```bash
-python get_parquetfiles.py -year 2020 username/dataset_name -local_dir /data/raw_parquet
+python get_parquetfiles.py --year 2020 --repo foo/bar --local_dir /data/raw_parquet
 ```
 
 **Argument Reference:**
-*   `-year`: The 4-character year prefix (e.g., `2020`) used to filter the files.
-*   `repo`: The Hugging Face repository ID (e.g., `username/dataset_name`).
+*   `--year`: The 4-character year prefix (e.g., `2020`) used to filter the files.
+*   `--repo`: The Hugging Face repository ID following the standard pattern of username/datasetname (here, user 'foo', dataset = 'bar').
 *   `-local_dir`: The absolute path to the local directory where the `.parquet` files will be saved.
 
-This script was more of a "Let's see if I can do it my way" exercise.
-Note : requirements : HfFolder will need an HF token to have been set up to access the dataset.
-
-
-## Step2
-Step 2 is performed by `make_conll.py`
-This step takes parquet files retrieved in Step1, and extracts articles from them, exporting the data to json files as an intermediate step. This means we do the slower parquet processing step once.
-The files can thus be inspected and any changes made much more speedily than from the parquet, before exporting the data to the conll files the parsing script wants.
 
 ### 2. Data Extraction and ConLLU Conversion
 
@@ -51,9 +43,9 @@ This script serves as the core processing engine, transforming raw parquet data 
 2.  **JSON to CoNLLU**: Loads JSON $\rightarrow$ Cleans text $\rightarrow$ Tokenizes via `spacy` $\rightarrow$ Serializes to CoNLLU with unique `uuid` and `sent_id`.
 
 #### Example Usage:
-To process French data from 2017 using 8 parallel workers:
+To export data from 2017 filtering on the `lemonade.fr` domain, looking for English articles, with  8 parallel workers:
 ```bash
-python make_conll.py -year 2017 -filter_type domain -filter_value lemonade.fr --nproc 8 -lang en
+python make_conll.py -year 2017 -filter_type domain -filter_value lemonde.fr --nproc 8 -lang en
 ```
 
 **Argument Reference:**
@@ -93,11 +85,11 @@ python parse_conll.py -lang fr -size 1.0
 
 **Argument Reference:**
 *   `-lang`: The 2-3 letter language code expected by Stanza (e.g., `en`, `fr`, `de`, `it`, `es`, `ang`, `fro`, `frm`).
-*   `-size`: An integer or float used to define batch sizes for `mwt_batch_size`, `pos_batch_size`, `lemma_batch_size`, `depparse_batch_size` and  `depparse_second_batch_size`. The base batch size is calculated as `size * 1024`. This determines the memory footprint of the NLP workers.
+*   `-size`: An integer or float used to define `mwt_batch_size`, `pos_batch_size`, `lemma_batch_size`, `depparse_batch_size` and  `depparse_second_batch_size`. The base batch size is calculated as `size * 1024` so specifying `1.0` will limit batch sizes to 1024. 
 *   `-depparseOnly`: If set to `T` or `True`, the script will only run the dependency parser. The input files must be well-formatted CoNLL with at least POS and LEM annotations already present.
 *   `--subf`: (Optional) Specifies a subfolder within `tag_input` to process. If left blank, the script scans the root `tag_input` directory for both `.conll` and `.conllu` files.
 
-*   
+
 ### 4. ConLL to Article XML Conversion
 #### Key Features:
 *   **Metadata Extraction**: Uses article and sentence IDs to insert article-level metadata (titles, authors, publication dates, URLs, and crawl timestamps).
@@ -116,9 +108,9 @@ python parse_conll.py -lang fr -size 1.0
 4.  **Source Description**: Populates a specific `<sourceDesc>` block with crawl URLs and timestamps extracted from the metadata.
 
 #### Example Usage:
-To process all files from 2020 in the English subfolder using 4 parallel workers:
+To process all files from 2020 in English, using 4 parallel workers, consolidating all the files for the SMH (Sydney Morning Herald) into 1 xml file `shm.xml`:
 ```bash
-python send_to_xml.py -year 2020 -mode A -lang en --nproc 4 -consolidate True -publi smh
+python send_to_xml.py -year 2020 -mode A -lang en --nproc 4 --log /data/logs/mylogfile.txt -consolidate True -publi smh
 ```
 
 **Argument Reference:**
