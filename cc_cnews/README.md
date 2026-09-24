@@ -24,7 +24,7 @@ python get_parquetfiles.py --year 2020 --repo foo/bar --local_dir /data/raw_parq
 **Argument Reference:**
 *   `--year`: The 4-character year prefix (e.g., `2020`) used to filter the files.
 *   `--repo`: The Hugging Face repository ID following the standard pattern of username/datasetname (here, user 'foo', dataset = 'bar').
-*   `-local_dir`: The absolute path to the local directory where the `.parquet` files will be saved.
+*   `--local_dir`: The absolute path to the local directory where the `.parquet` files will be saved.
 
 
 ### 2. Data Extraction and ConLLU Conversion
