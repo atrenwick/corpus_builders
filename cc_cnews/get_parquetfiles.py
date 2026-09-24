@@ -55,9 +55,9 @@ def download_files_for_year(year, repo_id, local_dir):
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download specific parquet files from  a HF repo to a specified directory.")
-    parser.add_argument("-year",help="YEAR for folder in standard hierarchy ")
-    parser.add_argument("repo", help="path to HF repo")
-    parser.add_argument("-local_dir", help="absolute path to local directory where files will be downloaded")
+    parser.add_argument("--year",help="YEAR for folder in standard hierarchy ")
+    parser.add_argument("--repo", help="path to HF repo")
+    parser.add_argument("--local_dir", help="absolute path to local directory where files will be downloaded")
     args = parser.parse_args()
   
     year = str(args.year)
