@@ -1,27 +1,53 @@
+"""Insert CoNLL file annotations into the source XML file to"""
 import argparse
-import glob
 import os
-import re
-
-from lxml import etree
-from pathlib import Path
-from stanza.utils.conll import CoNLL
-from tqdm import tqdm
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from functools import partial
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+from lxml import etree
+from stanza.utils.conll import CoNLL
+from tqdm import tqdm
+
+@dataclass
+class ProcessingConfig:
+    """Configuration for a single file-processing run.
+
+    Bundles the paths, identifiers, and runtime options needed by
+    `main()` to process a batch of files, so they can be passed
+    around as a set of arguments.
+
+    Attributes:
+        conll_source: Path to the folder with tagged CoNLL files.
+        xml_dirname: Name *not path* of dir with XML files as input.
+        output_path: Name *not path* of dir where XML trees will be exported.
+        id_attrib: Name of the XML attribute used as id in XML : eg id, s, s_id…
+        n_workers: Number of workers to request.
+        mode: Processing mode selector. 
+            Run in sibling mode to process a folder of conll files AND 
+            all its sibling folders.
+    """
+    conll_source: str
+    xml_dirname: str
+    xml_output_dirname: str
+    id_attrib: str
+    n_procs: int
+    sibling: bool
+
 
 def make_file_names(
-    tagged_file: Union[str, Path], 
-    xml_dirname: str, 
+    tagged_file: Union[str, Path],
+    xml_dirname: str,
     xml_output_dirname: str
 ) -> Tuple[Path, Path]:
     """Constructs input and output paths by swapping directory names in a hierarchy.
 
-    This function takes a file path and identifies a specific directory in the 
-    hierarchy (the 'conll' directory). It then replaces that directory name 
-    with a new input name and a new output name to generate full paths for 
+    This function takes a file path and identifies a specific directory in the
+    hierarchy (the 'conll' directory). It then replaces that directory name
+    with a new input name and a new output name to generate full paths for
     XML files.
 
     Args:
@@ -37,12 +63,12 @@ def make_file_names(
     """
     # Convert to Path object for consistent behavior
     tagged_path = Path(tagged_file)
-    
+
     # Extract the base filename, conll dirname and subfolder - 01, 02…
     file_basename = tagged_path.stem.replace('_OUT', '')
     conll_dirname = tagged_path.parent.parent.name
     parent_str = str(tagged_path.parent)
-    
+
     # ---- Construct XML Input Path ----
     xml_input_dir_str = parent_str.replace(conll_dirname, xml_dirname)
     xml_input_filepath = Path(xml_input_dir_str) / f"{file_basename}.xml"
@@ -52,32 +78,32 @@ def make_file_names(
     xml_output_dir_path = Path(xml_output_dir_str)
     xml_output_dir_path.mkdir(parents=True, exist_ok=True)
     xml_output_filepath = xml_output_dir_path / f"{file_basename}_full.xml"
-    
+
     return xml_input_filepath, xml_output_filepath
 
 
 
 def prepare_xml_tree(
-    xml_input_filepath: Union[str, Path], 
+    xml_input_filepath: Union[str, Path],
     id_attrib: str
 ) -> Tuple[etree._Element, Dict[str, etree._Element]]:
     """Parses an XML file and builds a dictionary mapping IDs to 's' elements.
 
-    This function parses an XML file, finds all elements with the tag 's', 
-    and creates a dictionary where the keys are the values of a specific 
+    This function parses an XML file, finds all elements with the tag 's',
+    and creates a dictionary where the keys are the values of a specific
     attribute (e.g., 'id' or 's_id') and the values are the elements themselves.
-    If only one element is found, it attempts to swap the attribute naming 
+    If only one element is found, it attempts to swap the attribute naming
     convention to find a more appropriate mapping.
 
     Args:
         xml_input_filepath: The path to the XML file to be parsed.
-        id_attrib: The primary attribute name to use for identification 
+        id_attrib: The primary attribute name to use for identification
             (e.g., "s_id" or "id").
 
     Returns:
         A tuple containing:
             - The parsed lxml etree object.
-            - A dictionary mapping the attribute values to the corresponding 
+            - A dictionary mapping the attribute values to the corresponding
               's' elements.
 
     Raises:
@@ -99,35 +125,37 @@ def prepare_xml_tree(
     # There should be more than 1 sentence in the dict, so try alternative attributes
     if len(target_dict) == 1:
         print("Trying alternative attribs to get valid_dict")
-        
+
         if id_attrib == "s_id":
             # Swap "s_id" -> "id"
             alt_attr = id_attrib.replace('s_', '')
-            target_dict = {el.get(alt_attr): el for el in s_elements if el.get(alt_attr) is not None}
+            target_dict = {
+              el.get(alt_attr): el for el in s_elements if el.get(alt_attr) is not None
+              }
         elif id_attrib == "id":
             # Swap "id" -> "s_id"
             alt_attr = f"s_{id_attrib}"
-            target_dict = {el.get(alt_attr): el for el in s_elements if el.get(alt_attr) is not None}
+            target_dict = {
+              el.get(alt_attr): el for el in s_elements if el.get(alt_attr) is not None
+              }
 
     return input_tree, target_dict
 
 
 def add_parse_to_tree(
-    input_tree: etree._Element, 
-    target_dict: Dict[str, etree._Element], 
+    target_dict: Dict[str, etree._Element],
     tagged_file: Union[str, Path]
 ) -> None:
     """Updates the XML tree with text content parsed from a CoNLL file.
 
-    This function loads a CoNLL file, iterates through its sentences, 
-    locates the corresponding sentence element in the XML tree using a 
-    matching ID, removes any 'w' (word) child elements from that XML 
-    node, and replaces the node's text with the new CoNLL-formatted 
+    This function loads a CoNLL file, iterates through its sentences,
+    locates the corresponding sentence element in the XML tree using a
+    matching ID, removes any 'w' (word) child elements from that XML
+    node, and replaces the node's text with the new CoNLL-formatted
     sentence string.
 
     Args:
-        input_tree: The lxml etree object containing the XML structure.
-        target_dict: A dictionary mapping sentence IDs (from the CoNLL 
+        target_dict: A dictionary mapping sentence IDs (from the CoNLL
             comments) to the corresponding 's' elements in the XML.
         tagged_file: The path to the CoNLL file to be parsed.
 
@@ -136,7 +164,7 @@ def add_parse_to_tree(
 
     Raises:
         FileNotFoundError: If the tagged_file path is invalid.
-        KeyError: If a sentence ID is found in the CoNLL file but is 
+        KeyError: If a sentence ID is found in the CoNLL file but is
             missing from the target_dict.
     """
     # Convert to Path for consistency
@@ -150,38 +178,38 @@ def add_parse_to_tree(
     for sent in conll_doc.sentences:
         first_comment_raw = sent.comments[0]
         sent_id = first_comment_raw.replace('# sent_id = ', '').strip()
-        
+
         if sent_id not in target_dict:
-            print(f"Warning: Sentence ID {sent_id} not found in target_dict. Skipping file {tagged_path}.")
+            print(f"Warning: Sentence ID {sent_id} not in target_dict. Skipping {tagged_path}.")
             break
-            
+
         # Retrieve the corresponding XML element
         target_el = target_dict[sent_id]
-        
+
         # Remove all 'w' tags from the target element
         droplist = target_el.findall(".//w")
         for item in droplist:
             parent = item.getparent()
             if parent is not None:
                 parent.remove(item)
-        
+
         # Generate the new CoNLL string for the sentence
         conll_chunk = "\n".join([token.to_conll_text() for token in sent.tokens])
-        
+
         # Update the XML element text
         target_el.text = conll_chunk
 
 
 
 def process_one_file(
-    tagged_file: Union[str, Path], 
-    xml_dirname: str, 
-    xml_output_dirname: str, 
+    tagged_file: Union[str, Path],
+    xml_dirname: str,
+    xml_output_dirname: str,
     id_attrib: str
 ) -> None:
     """Runs the full pipeline to consolidate annotations and reference xml files.
 
-    This function coordinates the path generation, XML parsing, CoNLL 
+    This function coordinates the path generation, XML parsing, CoNLL
     data injection, and final file writing for one specific file.
 
     Args:
@@ -199,20 +227,20 @@ def process_one_file(
     """
     # 1. Determine Paths
     xml_input_filepath, xml_output_filepath = make_file_names(
-        tagged_file, 
-        xml_dirname, 
+        tagged_file,
+        xml_dirname,
         xml_output_dirname
     )
 
     # 2. Parse & Map
     input_tree, target_dict = prepare_xml_tree(xml_input_filepath, id_attrib)
 
-    # 3. Inject Data
-    add_parse_to_tree(input_tree, target_dict, tagged_file)
+    # 3. Inject Data into tree via dict
+    add_parse_to_tree(target_dict, tagged_file)
 
     # 4. Write modified tree to the new location
     input_tree.write(str(xml_output_filepath), encoding='UTF-8', pretty_print=True)
-        
+
 
 
 
@@ -221,13 +249,13 @@ def safely_process_one_file(file_path: str, **kwargs: Any) -> Tuple[bool, Option
 
     Args:
         file_path (str): The path to the file to be processed.
-        **kwargs (Any): Arbitrary keyword arguments to be passed to 
+        **kwargs (Any): Arbitrary keyword arguments to be passed to
             process_one_file.
 
     Returns:
-        Tuple[bool, Optional[str]]: A tuple where the first element is a 
-            boolean indicating success (True) or failure (False), and the 
-            second element is an error message string if processing failed, 
+        Tuple[bool, Optional[str]]: A tuple where the first element is a
+            boolean indicating success (True) or failure (False), and the
+            second element is an error message string if processing failed,
             otherwise None.
     """
     try:
@@ -236,19 +264,18 @@ def safely_process_one_file(file_path: str, **kwargs: Any) -> Tuple[bool, Option
     except Exception as e:
         return False, f"{file_path}: {e}"
 
-
 def make_tagged_file_lists(conll_source: Union[str, Path], sibling: bool) -> List[Path]:
     """Generates a sorted list of CoNLL file paths based on a source file.
 
     This function identifies files to process based on a reference path.
-    - If `sibling` is True: It looks into all subdirectories of the parent 
+    - If `sibling` is True: It looks into all subdirectories of the parent
       directory of the source, collecting all .conll files within them.
-    - If `sibling` is False: It looks for all .conll files in the same 
+    - If `sibling` is False: It looks for all .conll files in the same
       directory as the source file.
 
     Args:
         conll_source: The path to a reference CoNLL file.
-        sibling: If True, search subdirectories of the source's parent. 
+        sibling: If True, search subdirectories of the source's parent.
             If False, search the source's parent directory directly.
 
     Returns:
@@ -265,12 +292,12 @@ def make_tagged_file_lists(conll_source: Union[str, Path], sibling: bool) -> Lis
         folders = sorted([
             p for p in parent_dir.iterdir() if p.is_dir()
         ])
-        
+
         # Collect .conll files from every subdirectory
         for folder in folders:
             files = sorted(folder.glob("*.conll"))
             tagged_files.extend(files)
-            
+
     else:
         # Look for .conll files in the specified dir only
         tagged_files = sorted(parent_dir.glob("*.conll"))
@@ -279,32 +306,8 @@ def make_tagged_file_lists(conll_source: Union[str, Path], sibling: bool) -> Lis
 
 
 
-def safely_process_one_file(
-    tagged_file: Union[str, Path], 
-    xml_dirname: str, 
-    xml_output_dirname: str, 
-    id_attrib: str
-) -> Tuple[bool, Union[str, None]]:
-    """Wrapper to catch exceptions during parallel processing.
-    
-    Returns:
-        (True, None) if successful.
-        (False, error_message) if an exception occurred.
-    """
-    try:
-        process_one_file(tagged_file, xml_dirname, xml_output_dirname, id_attrib)
-        return True, None
-    except Exception as e:
-        return False, str(e)
 
-def main(
-    conll_source: Path,
-    xml_dirname: str,
-    xml_output_dirname: str,
-    id_attrib: str,
-    n_procs: int,
-    sibling: bool
-) -> None:
+def main(config: ProcessingConfig) -> None:
     """Main entry point for the parallel XML annotation pipeline.
 
     Args:
@@ -316,25 +319,25 @@ def main(
         sibling: Whether to search sibling directories for files.
     """
     # 1. Make file list
-    tagged_files = make_tagged_file_lists(conll_source, sibling)
+    tagged_files = make_tagged_file_lists(config.conll_source, config.sibling)
     file_count = len(tagged_files)
-    
+
     if file_count == 0:
-        print(f"No files with .conll extension found in {conll_source}")
+        print(f"No files with .conll extension found in {config.conll_source}")
         return
 
     print(f'Found {file_count} files to process.')
 
     # 2. Define the worker function with 3 frozen args
     safe_worker_function = partial(
-        safely_process_one_file, 
-        xml_dirname=xml_dirname,
-        xml_output_dirname=xml_output_dirname, 
-        id_attrib=id_attrib
+        safely_process_one_file,
+        xml_dirname=config.xml_dirname,
+        xml_output_dirname=config.xml_output_dirname,
+        id_attrib=config.id_attrib
     )
 
     # 3. Determine a safe size for the processor pool
-    actual_procs = min(n_procs, file_count, os.cpu_count() or 1)
+    actual_procs = min(config.n_procs, file_count, os.cpu_count() or 1)
     print(f"Starting pool with {actual_procs} workers.")
 
     # 4. Execution
@@ -351,46 +354,49 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Insert annotations into source XML file")
-    
+
     parser.add_argument(
-        "-c", "--conll_source", 
+        "-c", "--conll_source",
         help="Path to dir with tagged CoNLL files"
     )
     parser.add_argument(
-        "-i", "--xml_dirname", 
+        "-i", "--xml_dirname",
         help="Name (not path) of dir with xml files as input"
     )
     parser.add_argument(
-        "-o", "--xml_output", 
+        "-o", "--xml_output",
         help="Name (not path) of dir where xml trees will be exported"
     )
     parser.add_argument(
-        "--id_attrib", 
+        "--id_attrib",
         help="attribute of s elements used as id : s, s_id…"
     )
     parser.add_argument(
-        "--n_procs", 
-        help="How many worker processes to request", 
-        required=False, 
-        default=2, 
-        type=int, 
+        "--n_procs",
+        help="How many worker processes to request",
+        required=False,
+        default=2,
+        type=int,
         metavar="N"
     )
     parser.add_argument(
-        "--sibling", 
-        help="Run in sibling mode : specify a folder of conll files and run the process for all its siblings", 
-        required=False, 
-        default=False, 
+        "--sibling",
+        help="Run in sibling mode to process a folder of conll files \
+        and run the process for all its sibling directories",
+        required=False,
+        default=False,
         action="store_true"
     )
 
     args = parser.parse_args()
-    
-    main(
+    config_from_args = ProcessingConfig(
         conll_source=Path(args.conll_source),
-        xml_dirname=args.xml_dirname,      
-        xml_output_dirname=args.xml_output,  
+        xml_dirname=args.xml_dirname,
+        xml_output_dirname=args.xml_output,
         id_attrib=str(args.id_attrib),
         n_procs=int(args.n_procs),
         sibling=bool(args.sibling)
-    )
+)
+
+
+    main(config_from_args)
