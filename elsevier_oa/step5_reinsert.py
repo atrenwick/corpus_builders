@@ -1,4 +1,4 @@
-"""Insert CoNLL file annotations into the source XML file to"""
+"""Insert CoNLL file annotations into the source XML file"""
 import argparse
 import os
 
