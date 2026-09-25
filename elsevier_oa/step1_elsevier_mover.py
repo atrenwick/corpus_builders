@@ -1,7 +1,6 @@
-
+"""Move json files into subfolders"""
 import argparse
 import os
-import glob
 import re
 
 from pathlib import Path
@@ -19,9 +18,8 @@ def run_main_mover(source_dir: str, extension: str, chunk_size: int, verbose: bo
 
     Returns:
         None:
+    """
 
-    """    
-    
     tidy_extension = re.sub(r"^\.","", extension)
     file_list = sorted([str(p) for p in Path(source_dir).glob(f"*.{tidy_extension}")])
     chunk = 1
@@ -38,10 +36,10 @@ def run_main_mover(source_dir: str, extension: str, chunk_size: int, verbose: bo
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='''Move json files into subfolders.
-    
-    Usage : 
+
+    Usage :
       python3 /scripts/1_make_subfolders.py --source /data/elsevier_oa/data --chunks 1000 --extension json --verbose
-            
+
     ''')
     parser.add_argument(
         "--source", type=str,help="path to file1 AKA fileA", required = True
@@ -50,16 +48,19 @@ if __name__ == "__main__":
         "--extension", type=str,help="file extension without the dot, eg json", required = True
     )
     parser.add_argument(
-        "--chunks", type=int,help="Chunk size in files, defaults to 1000", default=1000, required=False
+        "--chunks",
+        type=int,
+        help="Chunk size in files, defaults to 1000",
+        default=1000,
+        required=False
     )
     parser.add_argument(
         "--verbose", action="store_true", default=False
     )
     args = parser.parse_args()
-    
-    source_dir = args.source
-    extension = args.extension
-    chunk_size = args.chunks
-    verbose = args.verbose
-    run_main_mover(source_dir, extension, chunk_size, verbose)
 
+    my_source_dir = args.source
+    chosen_extension = args.extension
+    chosen_chunk_size = args.chunks
+    use_verbose = args.verbose
+    run_main_mover(my_source_dir, chosen_extension, chosen_chunk_size, use_verbose)
