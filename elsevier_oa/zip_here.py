@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-import glob
+"""A helper to zip all the items in FOLDER if fullname ends with SUFFIX
+using maximum compression with zipfile"""
 import os
-import sys
 import zipfile
 import argparse
 
-from tqdm import tqdm
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 from typing import Any, Tuple, List, Optional, Union
-from multiprocessing import Pool, cpu_count
-from functools import partial
-from concurrent.futures import ProcessPoolExecutor
 
+
+from tqdm import tqdm
 
 ## functions dealing with folders
 def zip_subfolders(input_folder: Path, extension: str, n_procs: int) -> None:
@@ -37,7 +37,7 @@ def zip_subfolders(input_folder: Path, extension: str, n_procs: int) -> None:
     # Get list of subdirectories (filtering out files)
     # Using .iterdir() is the Pathlib equivalent of os.scandir
     subfolders = [f for f in input_folder.iterdir() if f.is_dir()]
-    
+
     if not subfolders:
         print(f"No subfolders found in {input_folder}")
         return
@@ -54,7 +54,7 @@ def zip_subfolders(input_folder: Path, extension: str, n_procs: int) -> None:
     with ProcessPoolExecutor(max_workers=actual_procs) as executor:
         # map returns results in order. We wrap it in tqdm for the progress bar.
         results = list(tqdm(
-            executor.map(safe_worker_function, subfolders), 
+            executor.map(safe_worker_function, subfolders),
             total=len(subfolders),
             desc="Zipping folders"
         ))
@@ -68,13 +68,13 @@ def safely_process_one_folder(folder_path: str, **kwargs: Any) -> Tuple[bool, Op
 
     Args:
         folder_path (str): The path to the folder to be processed.
-        **kwargs (Any): Arbitrary keyword arguments to be passed to 
+        **kwargs (Any): Arbitrary keyword arguments to be passed to
             process_one_file.
 
     Returns:
-        Tuple[bool, Optional[str]]: A tuple where the first element is a 
-            boolean indicating success (True) or failure (False), and the 
-            second element is an error message string if processing failed, 
+        Tuple[bool, Optional[str]]: A tuple where the first element is a
+            boolean indicating success (True) or failure (False), and the
+            second element is an error message string if processing failed,
             otherwise None.
     """
     try:
@@ -82,6 +82,7 @@ def safely_process_one_folder(folder_path: str, **kwargs: Any) -> Tuple[bool, Op
         return True, None
     except Exception as e:
         return False, f"{folder_path}: {e}"
+
 def process_one_folder(folder_path: Path, extension: str) -> None:
     """Zips all files with a specific extension in a folder into a .zip archive.
 
@@ -106,28 +107,28 @@ def process_one_folder(folder_path: Path, extension: str) -> None:
 
     # Construct the zip filename (e.g., /path/to/folder -> /path/to/folder.zip)
     zip_filename = folder_path.with_name(f"{folder_path.name}.zip")
-    
+
     with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
         # recursively filter by extension and get relative paths
         for file_path in folder_path.rglob(f"*.{extension}"):
             relative_path = file_path.relative_to(folder_path)
-            
+
             # Add the file to the zip archive
             zipf.write(file_path, relative_path)
 
-## functions dealing with files 
+## functions dealing with files
 def safely_process_one_file(file_path: str, **kwargs: Any) -> Tuple[bool, Optional[str]]:
     """Safely execute zip_one_folder and catch any exceptions.
 
     Args:
         file_path (str): The path to the file to be processed.
-        **kwargs (Any): Arbitrary keyword arguments to be passed to 
+        **kwargs (Any): Arbitrary keyword arguments to be passed to
             process_one_file.
 
     Returns:
-        Tuple[bool, Optional[str]]: A tuple where the first element is a 
-            boolean indicating success (True) or failure (False), and the 
-            second element is an error message string if processing failed, 
+        Tuple[bool, Optional[str]]: A tuple where the first element is a
+            boolean indicating success (True) or failure (False), and the
+            second element is an error message string if processing failed,
             otherwise None.
     """
     try:
@@ -135,6 +136,7 @@ def safely_process_one_file(file_path: str, **kwargs: Any) -> Tuple[bool, Option
         return True, None
     except Exception as e:
         return False, f"{file_path}: {e}"
+
 def process_one_file(file_path: Path, folder_path: Path) -> None:
     """Zips a single file into its own archive.
 
@@ -152,9 +154,10 @@ def process_one_file(file_path: Path, folder_path: Path) -> None:
     zip_path = file_path.with_suffix(".zip")
     relative_path = file_path.relative_to(folder_path)
 
-    # compress 
+    # compress
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
         zipf.write(file_path, arcname=str(relative_path))
+
 def zip_individually(folder_path: Path, extension: str, n_procs: int) -> None:
     """Processes all files of a specific extension in a folder in parallel.
 
@@ -174,7 +177,7 @@ def zip_individually(folder_path: Path, extension: str, n_procs: int) -> None:
 
     # Use pathlib's glob for cleaner file discovery
     source_files = list(folder_path.glob(f"*.{extension}"))
-    
+
     if not source_files:
         print(f"No files with extension {extension} found in {folder_path}")
         return
@@ -188,19 +191,18 @@ def zip_individually(folder_path: Path, extension: str, n_procs: int) -> None:
 
     with ProcessPoolExecutor(max_workers=actual_procs) as executor:
         # Use list() to force evaluation so tqdm can track the total count
-        results = list(tqdm(
+        _ = list(tqdm(
             executor.map(worker_func, source_files),
             total=len(source_files),
             desc=f"Zipping {extension} files"
         ))
 
-
 def make_monolithic_archive(folder_path: Union[str, Path], extension: str, savename: str) -> None:
     """Recursively zips files with a specific extension from a given folder.
 
-    This function walks through the directory tree of the provided folder, 
-    identifies all files ending with the specified extension, and compresses 
-    them into a single .zip file located in the same directory as the 
+    This function walks through the directory tree of the provided folder,
+    identifies all files ending with the specified extension, and compresses
+    them into a single .zip file located in the same directory as the
     source folder.
 
     Args:
@@ -212,12 +214,12 @@ def make_monolithic_archive(folder_path: Union[str, Path], extension: str, saven
 
     Raises:
         FileNotFoundError: If the provided folder_path does not exist.
-        PermissionError: If the script lacks permissions to read the folder 
+        PermissionError: If the script lacks permissions to read the folder
             or write the zip file.
     """
     # Convert to Path object for robust path manipulation
     base_path = Path(folder_path)
-    
+
     if not base_path.exists() or not base_path.is_dir():
         raise FileNotFoundError(f"The path {folder_path} is not a valid directory.")
 
@@ -230,46 +232,64 @@ def make_monolithic_archive(folder_path: Union[str, Path], extension: str, saven
 
     # ---- First pass: collect matching files ----
     matching_files: List[Tuple[Path, Path]] = []
-    
+
     # rglob handles recursive searching and returns Path objects
     for path in base_path.rglob(f"*{extension}"):
         if path.is_file():
             # Calculate the path relative to the base folder
             rel_path = path.relative_to(base_path)
             matching_files.append((path, rel_path))
-    
+
     print(f"Found {len(matching_files)} matching files.")
-    
+
     # ---- Second pass: write to zip with progress ----
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
         for full_path, rel_path in tqdm(matching_files, desc="Zipping", unit="file"):
             # rel_path must be converted to string for arcname
             zipf.write(full_path, arcname=str(rel_path))
-    
+
     print("Done.")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Zip all the items in FOLDER if fullname endswith SUFFIX ")
+    parser = argparse.ArgumentParser(
+        description="Zip all the items in FOLDER if fullname ends with SUFFIX"
+        )
 
-    parser.add_argument("--folder", help="Path to folder containing files to compress",required=True)
-    parser.add_argument("--savename", help="Save zip as this name",required=False, default="my_zip")
-    parser.add_argument("--extension", help="extension to search for",required=True)
-    parser.add_argument("--n_procs", type=int, default=2,help="Number of processors for the pool")
     parser.add_argument(
-        "--mode", 
-        dest="mode", 
-        choices=["mono", "indiv", "subfolder"], 
+        "--folder", 
+        help="Path to folder containing files to compress",
+        required=True
+        )
+    parser.add_argument(
+        "--savename",
+        help="Save zip as this name",
+        required=False,
+        default="my_zip"
+        )
+    parser.add_argument(
+        "--extension",
+        help="extension to search for",
+        required=True
+        )
+    parser.add_argument(
+        "--n_procs",
+        type=int,
+        default=2,
+        help="Number of processors for the pool"
+        )
+    parser.add_argument(
+        "--mode",
+        dest="mode",
+        choices=["mono", "indiv", "subfolder"],
         required=True,
         help="Select the processing mode (mono, indiv, or subfolder)"
     )
     args = parser.parse_args()
-    
+
     if args.mode == "mono":
         make_monolithic_archive(Path(args.folder), args.extension, args.savename)
     elif args.mode == "subfolder":
         zip_subfolders(Path(args.folder), args.extension, args.n_procs)
     else:
         zip_individually(Path(args.folder), args.extension, args.n_procs)
-
-
