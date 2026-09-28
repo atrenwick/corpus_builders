@@ -2,7 +2,7 @@
 
 # AlloCiné fan reviews: French-language movie reviews for corpus linguistics
 
-This project provides a complete pipeline to transform raw French movie reviews from a pickle format into a structured, metadata-rich **TEI XML Corpus**. The final output is designed to be compatible with **Lexicoscope 2.0**, enabling advanced linguistic querying across various film attributes.
+This project provides a pipeline to transform raw French movie reviews from a pickle format into a structured, metadata-rich **TEI XML Corpus**. The final output is designed to be compatible with **Lexicoscope 2.0**, enabling advanced linguistic querying across various film attributes.
 
 
 ## 📌 Project Overview
