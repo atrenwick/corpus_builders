@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-
+"""Get film metadata from the Allocine"""
 import argparse
 import time
+from typing import Any
 from pathlib import Path
 
 import requests
@@ -10,7 +11,7 @@ from lxml import etree
 from tqdm import tqdm
 
 
-def make_url_set(source_file):
+def make_url_set(source_file: str):
     """Reads URL fragments from a file and constructs a list of unique full URLs.
 
     Args:
@@ -27,9 +28,10 @@ def make_url_set(source_file):
             input_urls.append(full_url)
     url_list = list(set(input_urls))
     print(f"URL set made : {len(url_list)} items")
+
     return url_list
 
-def make_soup(response):
+def make_soup(response: requests.Response):
     """Parses the HTML content of a response object into a BeautifulSoup object.
 
     Args:
@@ -42,7 +44,7 @@ def make_soup(response):
     soup = BeautifulSoup(html_response, 'html.parser')
     return soup
 
-def get_duration(soup, release_date):
+def get_duration(soup: BeautifulSoup, release_date: str):
     """Extracts the film duration from the page soup by filtering out noise.
 
     Args:
@@ -54,12 +56,14 @@ def get_duration(soup, release_date):
     """
     div = soup.select_one("div.meta-body-item.meta-body-info")
     film_duration = next(
-        (x for x in div.stripped_strings if x not in ['', '|', 'sur', 'en salle', 'genre', release_date]),
+        (x for x in div.stripped_strings if x not in
+        ['', '|', 'sur', 'en salle', 'genre', release_date]
+        ),
         None
     )
     return film_duration
 
-def get_director(soup):
+def get_director(soup: BeautifulSoup):
     """Extracts the director's name from the page soup.
 
     Args:
@@ -70,7 +74,7 @@ def get_director(soup):
             cannot be found.
     """
     div = soup.select_one("div.meta-body-item.meta-body-direction.meta-body-oneline")
-    
+
     if div:
         # Use stripped_strings to get all text, already stripped
         director = next(
@@ -78,10 +82,10 @@ def get_director(soup):
             None
         )
     else:
-        director = 'UNK'  
+        director = 'UNK'
     return director
 
-def get_rating_data(soup):
+def get_rating_data(soup: BeautifulSoup):
     """Extracts press and spectator ratings from the film page.
 
     Args:
@@ -91,26 +95,19 @@ def get_rating_data(soup):
         tuple[str, str]: A tuple containing (press_rating, spect_rating). 
             Returns 'UNK' for either value if the rating is not found.
     """
-    # get review elements
-    review_contents = soup.select('div.rating-item-content')
-    press_rating = "_"
-    spect_rating = "_"
-    
-    for x in range(len(review_contents)):
-        label = review_contents[x].select_one('span').get_text(strip=True)
-        if label == "Presse":
-            press_rating = review_contents[x].select_one('span.stareval-note').get_text(strip=True)
-        if label == "Spectateurs":
-            spect_rating = review_contents[x].select_one('span.stareval-note').get_text(strip=True)
-            
-    if press_rating == '_':
-        press_rating = "UNK"
-    if spect_rating == "_":
-        spect_rating = "UNK"
-        
+    ratings: dict[str, str] = {}
+    for item in soup.select('div.rating-item-content'):
+        label_el = item.select_one('span')
+        note_el = item.select_one('span.stareval-note')
+        if label_el and note_el:
+            ratings[label_el.get_text(strip=True)] = note_el.get_text(strip=True)
+
+    press_rating = ratings.get("Presse", "UNK")
+    spect_rating = ratings.get("Spectateurs", "UNK")
+
     return press_rating, spect_rating
 
-def get_release_date(soup):
+def get_release_date(soup: BeautifulSoup):
     """Extracts the release date of the film.
 
     Args:
@@ -122,16 +119,16 @@ def get_release_date(soup):
     """
     try:
         temp_date = soup.select_one("span.date").get_text(strip=True)
-    except Exception as e:
+    except Exception:
         temp_date = "UNK"
 
     if temp_date == "":
         temp_date = "UNK"
-        
+
     output_date = temp_date
     return output_date
 
-def get_genre(soup):
+def get_genre(soup: BeautifulSoup):
     """Extracts the film genre from the movie page.
 
     Args:
@@ -143,11 +140,11 @@ def get_genre(soup):
     """
     try:
         genre = soup.select_one('a[href*="/films/genre-"]').get_text().replace('Films ', '')
-    except Exception as e:
+    except Exception:
         genre = "UNK"
     return genre
 
-def process_url(response):
+def process_url(response: requests.Response) -> etree._Element:
     """Orchestrates the extraction of movie metadata and packages it into an XML element.
 
     This function coordinates several helper functions to scrape the title, 
@@ -168,7 +165,7 @@ def process_url(response):
     duration = get_duration(soup, release_date)
     director = get_director(soup)
     press_rating, spect_rating = get_rating_data(soup)
-    
+
     meta_element = etree.Element("metadata")
     meta_element.set("url", str(response.url))
     meta_element.set("title", str(title))
@@ -178,10 +175,41 @@ def process_url(response):
     meta_element.set("director", str(director))
     meta_element.set("press_rating", str(press_rating))
     meta_element.set("spect_rating", str(spect_rating))
-    
+
     return meta_element
 
-def get_metas_from_urls(url_list, output_dir, delay=5.0, offset=0):
+
+
+def make_error_el(url: str, **attrs: Any) -> etree._Element:
+    """Build an <error> XML element describing a failed request.
+
+    The element always carries a ``url`` attribute. Any additional
+    keyword arguments are added as further attributes, so callers can
+    record whatever describes the failure (status code, exception text,
+    and so on).
+
+    Args:
+        url: The URL that failed to fetch or process.
+        **attrs: Extra attributes to set on the element, e.g.
+            ``status_code=404`` or ``exception="timeout"``. Values are
+            converted to strings, since XML attributes must be strings.
+
+    Returns:
+        An ``<error>`` element with ``url`` and any extra attributes set.
+
+    Example:
+        >>> el = make_error_el("https://example.com", status_code=404)
+        >>> el.get("status_code")
+        '404'
+    """
+    el = etree.Element("error")
+    el.set("url", str(url))
+    for key, value in attrs.items():
+        el.set(key, str(value))
+    return el
+
+
+def get_metas_from_urls(url_list:(list[str]), output_dir: str, delay:float=5.0, offset:int=0):
     """Fetches movie metadata from a list of URLs and saves progress to XML files.
 
     This function iterates through a set of URLs, requests the page content, 
@@ -205,21 +233,27 @@ def get_metas_from_urls(url_list, output_dir, delay=5.0, offset=0):
         my_urls = url_list
 
     full_tree = etree.Element('xml')
-    
+
     # We use enumerate(my_urls, 1) so that 'u' starts at 1 for easier modulo math
     for u, url in tqdm(enumerate(my_urls, 1)):
         try:
-            response = requests.request("GET", url)
+            response = requests.request("GET", url, timeout=20)
             if response.status_code == 200:
                 meta_element = process_url(response)
                 full_tree.append(meta_element)
             else:
-                err_el = etree.Element("error")
-                err_el.set("url", str(url))
+                err_el = make_error_el(url, exception="statuscode")
                 err_el.set("status_code", str(response.status_code))
                 full_tree.append(err_el)
+
+        except requests.exceptions.Timeout:
+            err_el = make_error_el(url, exception="timeout")
+            full_tree.append(err_el)
+
         except Exception as e:
-            # Catch connection errors or timeouts so the whole loop doesn't crash
+            # Catch other errors
+            err_el = make_error_el(url, exception=str(e))
+            full_tree.append(err_el)
             err_el = etree.Element("error")
             err_el.set("url", str(url))
             err_el.set("exception", str(e))
@@ -231,12 +265,16 @@ def get_metas_from_urls(url_list, output_dir, delay=5.0, offset=0):
         if u % 50 == 0:
             output_path_full = Path(output_dir) / f'allocine_metas_{str(u).zfill(6)}.xml'
             outtree = etree.ElementTree(full_tree)
-            outtree.write(output_path_full, encoding='UTF-8', pretty_print=True, xml_declaration=True)
+            outtree.write(
+                output_path_full,
+                encoding='UTF-8',
+                pretty_print=True,
+                xml_declaration=True
+                )
 
     # FINAL SAVE: Process the last remaining items (the final chunk)
     # This ensures that if you have 123 items, the last 23 are saved.
-    final_count = len(my_urls)
-    output_path_final = Path(output_dir) / f'allocine_metas_{str(final_count).zfill(6)}_final.xml'
+    output_path_final = Path(output_dir) / f'allocine_metas_{str(len(my_urls)).zfill(6)}_final.xml'
     outtree = etree.ElementTree(full_tree)
     outtree.write(output_path_final, encoding='UTF-8', pretty_print=True, xml_declaration=True)
 
@@ -248,53 +286,49 @@ if __name__ == "__main__":
 
     # 2. Define Required Arguments
     parser.add_argument(
-        "--source_file", 
-        type=str, 
-        required=True, 
+        "--source_file",
+        type=str,
+        required=True,
         help="Path to the text file containing URL fragments (one per line)."
     )
     parser.add_argument(
-        "--output_dir", 
-        type=str, 
-        required=True, 
+        "--output_dir",
+        type=str,
+        required=True,
         help="Directory where the resulting XML files will be saved."
     )
 
     # 3. Define Optional Arguments
     parser.add_argument(
-        "--delay", 
-        type=float, 
-        default=5.0, 
+        "--delay",
+        type=float,
+        default=5.0,
         help="Seconds to wait between requests to avoid being blocked (default: 5.0)."
     )
     parser.add_argument(
-        "--offset", 
-        type=int, 
-        default=0, 
+        "--offset",
+        type=int,
+        default=0,
         help="Index to start from in the URL list (useful for resuming crashes) (default: 0)."
     )
 
     # 4. Parse the arguments from the command line
     args = parser.parse_args()
-    source_file = args.source_file
-    output_dir = args.output_dir
-    delay = args.delay, 
-    offset = args.offset
-    
+
     # Ensure output directory exists
-    output_path = Path(output_dir)
+    output_path = Path(args.output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
     try:
-        print(f"Step 1: Loading URLs from {source_file}...")
-        url_list = make_url_set(source_file)
-        print(f"Step 2: Starting scrape with offset {offset} and delay {delay}s...")
+        print(f"Step 1: Loading URLs from {args.source_file}...")
+        arg_url_list = make_url_set(args.source_file)
+        print(f"Step 2: Starting scrape with offset {args.offset} and delay {args.delay}s...")
         # This will call the function we just wrote
-        final_xml_tree = get_metas_from_urls(
-            url_list = url_list, 
-            output_dir = output_dir, 
-            delay = delay, 
-            offset = offset
+        get_metas_from_urls(
+            arg_url_list,
+            args.output_dir,
+            args.delay,
+            args.offset
         )
 
         print("Process complete. Final XML tree generated.")
@@ -303,8 +337,3 @@ if __name__ == "__main__":
         print(f"Error: The file {args.source_file} was not found.")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
-
-
-
-
-
