@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Get film metadata from the Allocine"""
+"""Get film metadata from the Allocine website"""
 import argparse
 import time
 from typing import Any
