@@ -19,11 +19,6 @@ from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 import polars as pl
-# from spacy.lang.de import German
-# from spacy.lang.it import Italian
-# from spacy.lang.en import English
-# from spacy.lang.es import Spanish
-# from spacy.lang.fr import French
 from spacy.language import Language
 from spacy.tokens import Span
 from spacy.tokens import Doc
