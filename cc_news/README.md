@@ -1,5 +1,8 @@
 # cc_news: Creating corpora from CC News dumps 
 
+#### General:
+> [!IMPORTANT]
+> Parallel processing uses broad exception catching to silently log exceptions and report on them all at the end of a processing run, via printing to the console/writing to specific log file.
 
 ### 1. Dataset Acquisition (HF Download)
 
@@ -16,6 +19,7 @@ This script handles the initial data ingestion phase. It retrieves raw `.parquet
 > This script requires a Hugging Face Access Token. Ensure you are authenticated on your machine by running `huggingface-cli login` or by setting the `HF_TOKEN` environment variable before execution.
 
 
+
 #### Example Usage:
 ```bash
 python get_parquetfiles.py --year 2020 --repo foo/bar --local_dir /data/raw_parquet
@@ -24,7 +28,7 @@ python get_parquetfiles.py --year 2020 --repo foo/bar --local_dir /data/raw_parq
 **Argument Reference:**
 *   `--year`: The 4-character year prefix (e.g., `2020`) used to filter the files.
 *   `--repo`: The Hugging Face repository ID following the standard pattern of username/datasetname (here, user 'foo', dataset = 'bar').
-*   `--local_dir`: The absolute path to the local directory where the `.parquet` files will be saved.
+*   `--local_dir`: The absolute path to the local directory where the `.parquet` files will be saved. The hierarchy of folders and subfolders is used to organise downstream processing, with folders expected such as `0_raw_parquet`, `1_json`.
 
 ---
 
@@ -44,7 +48,7 @@ This script serves as the core processing engine, transforming raw parquet data 
 2.  **JSON to CoNLLU**: Loads JSON $\rightarrow$ Cleans text $\rightarrow$ Tokenizes via `spacy` $\rightarrow$ Serializes to CoNLLU with unique `uuid` and `sent_id`.
 
 #### Example Usage:
-To export data from 2017 filtering on the `lemonade.fr` domain, looking for English articles, with  8 parallel workers:
+To export data from 2017 filtering on the `lemonde.fr` domain, looking for English articles, with 8 parallel workers:
 ```bash
 python make_conll.py -year 2017 -filter_type domain -filter_value lemonde.fr --nproc 8 -lang en
 ```
@@ -89,7 +93,7 @@ python parse_conll.py -lang fr -size 1.0
 *   `-lang`: The 2-3 letter language code expected by Stanza (e.g., `en`, `fr`, `de`, `it`, `es`, `ang`, `fro`, `frm`).
 *   `-size`: An integer or float used to define `mwt_batch_size`, `pos_batch_size`, `lemma_batch_size`, `depparse_batch_size` and  `depparse_second_batch_size`. The base batch size is calculated as `size * 1024` so specifying `1.0` will limit batch sizes to 1024. 
 *   `-depparseOnly`: If set to `T` or `True`, the script will only run the dependency parser. The input files must be well-formatted CoNLL with at least POS and LEM annotations already present.
-*   `--subf`: (Optional) Specifies a subfolder within `tag_input` to process. If left blank, the script scans the root `tag_input` directory for both `.conll` and `.conllu` files.
+*   `--subf`: (Optional) Specifies a subfolder within `tag_input` to process. If left blank, the script scans the `tag_input` directory for both `.conll` and `.conllu` files.
 
 ---
 
@@ -114,14 +118,14 @@ python parse_conll.py -lang fr -size 1.0
 #### Example Usage:
 To process all files from 2020 in English, using 4 parallel workers, consolidating all the files for the SMH (Sydney Morning Herald) into 1 xml file `shm.xml`:
 ```bash
-python send_to_xml.py -year 2020 -mode A -lang en --nproc 4 --log /data/logs/mylogfile.txt -consolidate True -publi smh
+python send_to_xml.py --year 2020 --mode A --lang en --nproc 4 --log /data/logs/mylogfile.txt --consolidate --publi smh
 ```
 
 **Argument Reference:**
-*   `-year`: The year folder in the `cc_corpus` directory (e.g., `2020`).
-*   `-mode`: Filtering mode: `A` (All), `E` (Even numbers), or `O` (Odd numbers).
-*   `-lang`: Language code for language rules (e.g., `en`, `fr`).
+*   `--year`: The year folder in the `cc_corpus` directory (e.g., `2020`).
+*   `--mode`: Filtering mode: `A` (All), `E` (Even numbers), or `O` (Odd numbers).
+*   `--lang`: Language code for language rules (e.g., `en`, `fr`).
 *   `--nproc`: Number of parallel worker processes.
 *   `--log`: Path to the log file for tracking progress and errors.
-*   `-consolidate`: Boolean flag; if `True`, merges all individual XMLs into one file at the end.
-*   `-publi`: A regex-like file pattern to filter the specific publication you wish to process.
+*   `--consolidate`: Boolean flag; if `True`, merges all individual XMLs into one file at the end.
+*   `--publi`: A regex-like file pattern to filter the specific publication you wish to process.
