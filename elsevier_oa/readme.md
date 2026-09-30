@@ -31,7 +31,7 @@ The processing follows this sequence:
 
 **Example Usage:**
 ```bash
-python 1_elsevier_mover.py --source /data/elsevier_oa/data_step0 --chunks 1000 --extension json --verbose
+python step1_elsevier_mover.py --source /data/elsevier_oa/data_step0 --chunks 1000 --extension json --verbose
 ```
 *   `--source`: Path to folder containing 40,000 JSON files.
 *   `--chunks`: Number of files per chunk (default: 1000).
@@ -45,7 +45,7 @@ python 1_elsevier_mover.py --source /data/elsevier_oa/data_step0 --chunks 1000 -
 
 **Example Usage:**
 ```bash
-python 2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_dir /data/elsevier_oa/data_step1
+python step2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_dir /data/elsevier_oa/data_step1
 ```
 *   `--source_dir`: Path to folder containing the chunked JSON subfolders.
 *   `--output_dir`: Path to the new folder for output XML files (reproduces the folder organization).
@@ -57,7 +57,7 @@ python 2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_dir /
 
 **Example Usage:**
 ```bash
-python 3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --lang en
+python step3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --lang en
 ```
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
@@ -75,7 +75,7 @@ python 3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /da
 
 **Example Usage:**
 ```bash
-python 4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --lang en --offset 314
+python step4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --lang en --offset 314
 ```
 *   `--source_dir`: Path to folder containing tokenised XML files.
 *   `--output_dir`: Path to folder where sentencized XML files will be exported.
@@ -90,7 +90,7 @@ python 4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_dir /
 
 **Example Usage:**
 ```bash
-python 5_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirname data_step3 --xml_output data_step5 --id_attrib s_id --n_procs 4 --sibling
+python step5_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirname data_step3 --xml_output data_step5 --id_attrib s_id --n_procs 4 --sibling
 ```
 *   `--conll_source`: Path to folder containing tagged CoNLL files.
 *   `--xml_dirname`: The *name* (not path) of the folder containing the sentencised XML.
@@ -113,7 +113,7 @@ python 5_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirnam
 
 **Example Usage:**
 ```bash
-python 7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay 30 --buffer 10
+python step7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay 30 --buffer 10
 ```
 *   `--delay`: Seconds to pause between API calls.
 *   `--buffer`: Number of responses to hold in memory before flushing to disk.
@@ -125,7 +125,7 @@ python 7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay 30 
 
 **Example Usage:**
 ```bash
-python 8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /data/elsevier_oa/data_step6 --issn /data/elsevier_oa/data_step0/issn_success_titles.json --artmetas /data/elsevier_oa/data_step0/metadata_dict.json --n_procs 7 --sibling --extension .xml
+python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /data/elsevier_oa/data_step6 --issn /data/elsevier_oa/data_step0/issn_success_titles.json --artmetas /data/elsevier_oa/data_step0/metadata_dict.json --n_procs 7 --sibling --extension .xml
 ```
 *   `--source`: Path to the folder of XML files to process.
 *   `--output`: Path to the folder where output XML files will be exported.
@@ -144,3 +144,8 @@ A CLI helper to compress files/folders for archival or remote transfer.
 *   **Monolithic Mode** (`--mode mono`): Compresses a folder into a single zip.
 *   **Individual Mode** (`--mode indiv`): Compresses every file into its own zip file (parallelized via `--n_procs`).
 *   **Subfolder Mode** (`--mode subfolder`): Zips files with a specific extension into their respective subfolders (ideal for feeding files to a GPU server).
+**Example Usage:**
+```bash
+python zip_here.py --folder /Volumes/scratch/data/folder1 --savename squashedStuff --extension xml --n_procs 6 --mode indiv
+```
+  
