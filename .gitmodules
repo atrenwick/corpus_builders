@@ -1,0 +1,3 @@
+[submodule "elsevier_oa/.common"]
+	path = elsevier_oa/.common
+	url = https://github.com/atrenwick/corpus_builders.git
