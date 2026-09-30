@@ -1,219 +1,427 @@
-import glob
-import time
+"""coordinate parsing of CoNLL documents with stanza pipeline"""
 import argparse
+import sys
 import os
-import stanza
+import time
 
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, Union
+
+import stanza
 from stanza.utils.conll import CoNLL
+from stanza.models.common.doc import Document
 from tqdm import tqdm
 
-def write_annotations_to_file(conll_output, input_file, myletter, lang):
-	'''
-	Write the annotated document object to file
-	
-	Inputs: 
-		conll_output : CoNLL Document : a conll document object containing the annotated documents
-		input_file : str: absolute path to the file taken as input. This will be used to create the output file name and path
-	Returns:
-		no return object : a file is written to the specified location and confirmation message printed to the console
-	'''
-	## make name of output file and check that the folder containing it exists, creating it if not
-	output_file = input_file.replace('conll',f'{myletter}_{lang}_OUT.conll').replace('tag_input','tag_output')
-	check_outputpath(output_file)
-	
-	# make a string from the conll_output and write it
-	string = "{:C}".format(conll_output)
-	with open(output_file, 'w', encoding='UTF-8') as w:
-		_ = w.write(string)
-	print(f":::::			Exported to {output_file}")
-	
 
-def write_log(log_entry, launch_time):
-	'''
-	Simple helper to write-append a log entry to the logfile
-	Inputs:
-		log_entry : str : the string to write to the logfile
-		launch_time : int : unix time at which the parsing process was launched
-	Returns:
-		no return object : a string is write-appended to a file
-	'''
-	log_file_path = f'/home/username/tag_output/{launch_time}_log.txt'
-	with open(log_file_path ,'a', encoding='UTF-8') as k:
-		_ = k.write(log_entry)
+def write_annotations_to_file(
+    annotated_document: Document,
+    input_file: str,
+    parse_settings_dict: Dict[str, Any]
+    ) -> None:
+    """
+    Write the annotated document object to a file.
 
-def check_outputpath(output_file):
-	'''
-	Helper to ensure that when an output file is to be printed to output_file in a directory, the directory that is the immediate ascendent of output_file exists, creating it if not.
-	Inputs : 
-		output_file : str : absolute path to the outputfile to be written
-	Returns : 
-		no return object, a folder will be created if necessary
-	'''
-	target_path = os.path.dirname(output_file)
-	if os.path.exists(target_path) is False:
-		os.mkdir(target_path)
+    Constructs an output path by combining the input file's parent directory,
+    a destination folder (from parse_settings_dict), and a new filename
+    derived from the input filename and metadata.
+
+    Args:
+        annotated_document (Docuemnt): A CoNLL document object of annotated sentences.
+        input_file (str): The absolute path to the file taken as input.
+            This is used to determine the parent directory and the base filename.
+        parse_settings_dict (Dict[str, Any]): A dictionary of constants for parsing.
+            Expected keys used in this function:
+                - 'output_dir' (Path): Path of the folder to export
+                  annotations to.
+                - 'myletter' (str): Optional string prefix (defaults to '_').
+                - 'lang' (str): Language code to insert into the output filename.
+
+    Returns:
+        None: A file is written, and a confirmation message is printed to the console.
+    """
+    # Extract settings with sensible defaults
+    my_letter = parse_settings_dict.get('myletter', '_')
+    lang = parse_settings_dict.get('lang', 'UNK')
+    output_dir = parse_settings_dict.get('output_dir', '/data/output')
+
+    # Construct the new suffix, path
+    newvalue_fstring = f"{my_letter}_{lang}_OUT.conll"
+    input_file_path = Path(input_file)
+    new_basename = input_file_path.name.replace('.conll', newvalue_fstring)
+    output_fullpath = Path(output_dir) / new_basename
+
+    # Convert the document object to a string using the :C format specifier
+    string_content = f"{annotated_document:C}"
+
+    with open(output_fullpath, 'w', encoding='UTF-8') as w:
+        w.write(string_content)
+    print(f":::::            Exported to {output_fullpath}")
 
 
-def set_batch_sizes(my_size):
-	'''
-	Set batch sizes for Stanza processing
-	Inputs :
-		my_size : int, float or string : a number to be multiplied by 2e10 to define batch sizes for Stanza processing.
-	
-	Notes:
-	0. my_size is always sent to a float before all multiplications. It is after all multiplications that results are coerced to integers.
-	1. All batch sizes  [mwt_batch_size, pos_batch_size, lemma_batch_size, depparse_batch_size and depparse_second_batch_size] will be set to a common value, value1.
-	2. The only batch given a different size is pos_batch_maximum_tokens, which in the defaults has a value 16x that of the other batches. This function thus preserves that geometry.
-	'''
+def set_batch_sizes(my_size: Union[int, float, str]) -> Tuple[int, int]:
+    """
+    Set batch sizes for Stanza processing.
 
-	x = float(my_size)
-	value_1 = x * 1024
-	value_2 = x * 1024 *16
-	value_1 = int(value_1)
-	value_2 = int(value_2)	
-	mwt_batch_size = value_1
-	pos_batch_size=value_1
-	lemma_batch_size=value_1
-	depparse_batch_size=value_1
-	depparse_second_batch_size=value_1
-	pos_batch_maximum_tokens=value_2
-	return mwt_batch_size, pos_batch_size, lemma_batch_size, depparse_batch_size, depparse_second_batch_size, pos_batch_maximum_tokens
+    Args:
+        my_size (Union[int, float, str]): A numeric value (int, float, or string)
+            to be multiplied by 1024 to define base batch sizes.
 
-def load_nlp(lang, my_size, depparseOnly):
-	'''
-	TO DO :: would defining nlp object from dictionaries or dict comprehensions be tidier and or easier to read?
-	Load specific Stanza pipelines for pre-configured languages and processing needs
-	Inputs :
-		lang : language code (2 or three lowercase letters) to be passed to the `lang` argument in stanza.Pipeline. Also used as an exclusion value for Ancient Greek, for which DepparseOnly was not necessary
-		my_size : batch size to be passed to `set_batch_sizes` : input is cast to a float to allow for decimals to be entered easily
-		depparseOnly : T/F value to indicate whether to only dependency parsing only. Only `T` is recognised, all other input is interpreted as equivalent of `F`
-			If depparseOnly is T, input needs to be well-formatted conll with tokens, token ids (column 1), tokens (column 2), lemmas (column 3) and POS tags (column 4) as a minimum. FEATS and cols 9-10 can be present. Any values for HEAD, DEPPREL will be ignored.
-			If depparseOnly is False, pretokenised, pre-sentencised well-formatted conll is is required.
-	Returns :
-		nlp : an nlp object == stanza Pipeline object is returned.
-	'''
-	if lang != "grc":
-		mwt_batch_size, pos_batch_size, lemma_batch_size, depparse_batch_size, depparse_second_batch_size, pos_batch_maximum_tokens = set_batch_sizes(my_size)
-	
-	if depparseOnly =="T":
-		if lang =="fr":
-			nlp = stanza.Pipeline(lang="fr", package='gsd', processors="depparse", depparse_pretagged=True,  depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="fro":
-			nlp = stanza.Pipeline(lang="fro", processors="depparse", depparse_pretagged=True,  depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="frm":
-			nlp = stanza.Pipeline(lang="frm", processors="depparse", depparse_pretagged=True,  depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="en":
-			nlp = stanza.Pipeline(lang="en", package='ewt', processors="depparse", depparse_pretagged=True,  depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-	else:
-	
-		if lang =="ang":
-			nlp = stanza.Pipeline(lang="ang", package='nerthus', processors="tokenize,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="grc":
-			nlp = stanza.Pipeline(lang="grc")
-		if lang =="it":
-			nlp = stanza.Pipeline(lang="it", package='isdt', processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
+    Returns:
+        Tuple[int, int]: A tuple containing (std_batch_size, pos_max).
+            std_batch_size is used for all batches except pos_max, which is
+            set to 16x the std_batch_size preserving the default geometry.
+    """
 
-		if lang =="de":
-			nlp = stanza.Pipeline(lang="de", package='gsd', processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="es":
-			nlp = stanza.Pipeline(lang="es",  processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="fr":
-			nlp = stanza.Pipeline(lang="fr", package='gsd', processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="fro":
-			nlp = stanza.Pipeline(lang="fro",  processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-		if lang =="en":
-			nlp = stanza.Pipeline(lang="en", package='ewt', processors="tokenize,mwt,pos,lemma,depparse", tokenize_pretokenized=True, tokenize_ssplit=True, mwt_batch_size = mwt_batch_size, pos_batch_size=pos_batch_size, pos_batch_maximum_tokens=pos_batch_maximum_tokens, lemma_batch_size=lemma_batch_size, depparse_batch_size=depparse_batch_size, depparse_second_batch_size=depparse_second_batch_size)
-	return nlp
-	
-def run_parsing(input_files, lang, my_size, depparseOnly):
-	'''
-	Parse the files with Stanza
-	Inputs:
-		input_files : list : a list of files to process
-		lang : string : the 2-3 letter code of the language of the files to be processed as Stanza expects it
-		my_size : int : an integer used to define batch sizes for the processors in the NLP pipeline
-		depparseOnly : string/bool : string (T, True, F, False) or boolean (True, False) determining which processors in the NLP pipeline to call. If True or T, only the dependency parser will be called. For processing to be successful, input data needs to be well-formatted conll with at least POS, LEM annotations present.
-	
-	'''
+    x = float(my_size)
+    std_batch_size = int(x * 1024)
+    pos_max = std_batch_size * 16
+    return (std_batch_size, pos_max)
 
-	# check we have files to process
-	print(f'{len(input_files)} files found')
+def load_nlp(lang: str, my_size: Union[int, float, str], depparse_only: bool) -> stanza.Pipeline:
+    """
+    Load specific Stanza pipelines for pre-configured languages and processing needs.
 
-	if len(input_files)>0:
-		# prepare logs
-		log, error_log =[], []
-		launch_time = time.time()
-		log_file_path = f'/home/username/tag_output/{launch_time}_log.txt'
+    Args:
+        lang (str): Language code (e.g., 'en', 'fr', 'grc') to be passed to the
+            `lang` argument in stanza.Pipeline.
+        my_size (Union[int, float, str]): Batch size multiplier passed to
+            `set_batch_sizes`. Input is cast to float to allow for decimal input.
+        depparse_only (bool): Indicate whether to only perform dependency parsing
+            - If True, requires well-formatted CoNLL with tokens, IDs, lemmas, and POS tags.
+                Any existing HEAD or DEPREL entries will be overwritten.
+            - If False, requires pre-tokenized, pre-sentencized well-formatted CoNLL.
+            - Note: For 'grc' (Ancient Greek), depparse_only is ignored.
 
-		# wordlimit after which a sentence is deemed 'too long' and yield useless dependency trees, due to length, sentence segmentation errors or repeating punctuation
-		limit = 1600
-	
-		## additional option to allow for another level of nesting or extending of output path. Default value is underscore, which may cause errors in downstream scripts relying on string.replace() methods looking for __
-		myletter="_" 
-	
-		# instantiate the nlp object and print batch sizes to the console
-		nlp = load_nlp(lang, my_size, depparseOnly)
-		for name, processor in nlp.processors.items(): 
-			for key, value in processor.config.items():
-				if "batch" in key:
-					print(f'{name}\t{key}\t{value}')
+    Returns:
+        stanza.Pipeline: A configured Stanza Pipeline object.
+    """
 
-		## make tidy list of batch sizes to insert into log
-		batch_sizes= [f'{name}\t{key}\t{value}' for key,value in processor.config.items() if 'batch' in key for name, processor in nlp.processors.items()]
-		batch_sizes_tidy = "\t".join([chunk for chunk in batch_sizes])
+    if lang == "grc":
+        return stanza.Pipeline(lang="grc")
 
-	
-		with open(log_file_path ,'a', encoding='UTF-8') as k:
-			for f, input_file	in tqdm(enumerate (input_files)):
-				try:
-					## load input file and check that no sentence has length exceeding `max_len` ; if so, add to log and skip file
-					starttime = time.time()
-					source_doc = CoNLL.conll2doc(input_file)
-					max_len = max([len(sent.tokens) for sent in source_doc.sentences])
-					if max_len >= limit:
-						report_string = f'\tSkipping {input_file} : max_len exceeded:: {max_len}\n'
-						write_log(str(report_string), launch_time)
-		
-					if max_len < limit:
-						## print the number of tokens in the doc to the console to allow for guesstimate of how long the doc will take to process, then annotate it
-						tokens = source_doc.num_tokens
-						print(f"\tProcessing {input_file} :: {tokens} tokens")
+    std_batch_size, pos_max = set_batch_sizes(my_size)
 
-						## run the nlp pipeline on the document
-						annotated_document =nlp(source_doc)
-					
-						## make name for output file explicitating that it's output, sending to appropriate output directory, checking that parent path exists, then write
-						write_annotations_to_file(annotated_document, input_file, myletter, lang)
-						source_new_name = input_file.replace('tag_input','tag_output')
-						os.rename(input_file, source_new_name)
+    # 1. map langs to packages
+    depparse_pkgs = {"fr": "gsd", "en": "ewt"}
+    full_pkgs = {"ang": "nerthus", "it": "isdt", "de": "gsd", "fr": "gsd", "en": "ewt"}
 
-						## make reportstring, write to log
-						report_string = f'{starttime}\t{time.time()}\t{tokens}\t{input_file}\t{batch_sizes_tidy}\n'
-						write_log(str(report_string),launch_time)
-				# log exceptions
-				except Exception as e:
-					report_string = f'{input_file}\t{e}\n'
-					print(report_string)
-					write_log(str(report_string), launch_time)		
+    # 2. Define the Language Lists
+    depparse_langs = ["fr", "fro", "frm", "en"]
+    full_langs = ["ang", "it", "de", "es", "fr", "fro", "en"]
+
+    # 3. Use dictionary comprehensions to build configs dynamically
+    #  **({...} if ...)  injects the 'package' key only if it exists in our mapping
+    depparse_configs = {
+        lang: {
+            "processors": "depparse",
+            "depparse_pretagged": True,
+            **({"package": depparse_pkgs[lang]} if lang in depparse_pkgs else {})
+        }
+        for lang in depparse_langs
+    }
+
+    full_configs = {
+        lang: {
+            "processors": "tokenize,mwt,pos,lemma,depparse",
+            "tokenize_pretokenized": True,
+            "tokenize_ssplit": True,
+            **({"package": full_pkgs[lang]} if lang in full_pkgs else {})
+        }
+        for lang in full_langs
+    }
+
+    # 4. Selection Logic
+    if depparse_only:
+        config = depparse_configs.get(lang, {}).copy()
+        if config:
+            config.update(
+                {
+                    "depparse_batch_size": std_batch_size,
+                    "depparse_second_batch_size": std_batch_size
+                    }
+                )
+    else:
+        config = full_configs.get(lang, {}).copy()
+        if config:
+            config.update({
+                "mwt_batch_size": std_batch_size,
+                "pos_batch_size": std_batch_size,
+                "pos_batch_maximum_tokens": pos_max,
+                "lemma_batch_size": std_batch_size,
+                "depparse_batch_size": std_batch_size,
+                "depparse_second_batch_size": std_batch_size
+            })
+
+    return stanza.Pipeline(lang=lang, **config)
+
+def make_config_reports(nlp: stanza.Pipeline) -> str:
+    """
+    Extracts and prints batch size configurations from a Stanza pipeline.
+
+    This function iterates through all processors in the provided Stanza
+    pipeline, identifies configuration keys containing the word 'batch',
+    prints them to the console, and compiles them into a formatted string
+    for logging purposes.
+
+    Args:
+        nlp (stanza.Pipeline): The Stanza pipeline object to inspect.
+
+    Returns:
+        str: A newline-separated string of processor names, configuration
+            keys, and values for all batch-related settings.
+    """
+    # Print to console
+    for name, processor in nlp.processors.items():
+        for key, value in processor.config.items():
+            if "batch" in key:
+                print(f'{name}\t{key}\t{value}')
+
+    # Create a tidy list of batch sizes to insert into log
+    # Note: The comprehension order is fixed to (outer loop, inner loop)
+    batch_sizes = [
+        f'{name}\t{key}\t{value}'
+        for name, processor in nlp.processors.items()
+        for key, value in processor.config.items()
+        if 'batch' in key
+    ]
+
+    return "\t".join(batch_sizes)
+
+
+def prepare_for_parsing(
+    input_files: List[str],
+    output_dirname: str,
+    lang: str,
+    my_size: float,
+    depparse_only: bool
+) -> Tuple[stanza.Pipeline, str, Dict[str, Any]]:
+    """
+    Initializes the Stanza NLP pipeline and prepares metadata for parsing.
+
+    This function captures the launch time, constructs a configuration dictionary
+    containing log paths and parsing limits, initializes the Stanza pipeline
+    based on language and batch size settings, and generates a summary of
+    the resulting batch configurations.
+
+    Args:
+        output_dirname (str): The name, *not path* to dir where files and logs
+            will be saved.
+        lang (str): The language code for the Stanza pipeline (e.g., 'en', 'fr').
+        my_size (float): The batch size multiplier used to calculate internal
+            Stanza batch limits.
+        depparse_only (bool): If True, loads a pipeline configured for
+            dependency parsing only.
+
+    Returns:
+        Tuple[stanza.Pipeline, str, Dict[str, Any]]: A tuple containing:
+            - nlp (stanza.Pipeline): The initialized Stanza pipeline object.
+            - batch_sizes_tidy (str): A formatted string summary of the
+              batch sizes for the initialized pipeline.
+            - parse_settings_dict (Dict[str, Any]): A dictionary containing
+              metadata for the run (launch time, log path, limit, etc.).
+    """
+    launch_time = time.time()
+    output_dir = Path(input_files[0]).parent.parent / output_dirname
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Construct metadata dictionary
+    parse_settings_dict = {
+        "launch_time" : launch_time,
+        "log_file_path": Path(f'{output_dir}/{launch_time}_log.txt'),
+        "output_dir": Path(output_dir),
+        "limit" : 1600,
+        "myletter": "_",
+        "lang": lang
+    }
+
+    # Initialize the NLP pipeline and generate the summary report
+    nlp = load_nlp(lang, my_size, depparse_only)
+    batch_sizes_tidy = make_config_reports(nlp)
+
+    return nlp, batch_sizes_tidy, parse_settings_dict
+
+def move_processed_source(input_file: Union[str,Path], parse_settings_dict: Dict[str: Any]) -> None:
+    '''
+    Move source documents to output folder after successful processing
+    Args:
+        input_file (Union[str, Path]): input .conll file successfully processed
+        parse_settings_dict (Dict[str, Any]): A dictionary containing
+              metadata for the run (launch time, log path, limit, etc.).
+    Returns:
+        None. The input file is moved to the output directory.
+    '''
+    output_dir = parse_settings_dict.get("output_dir")
+    input_file_path = Path(input_file)
+    output_fullpath = Path(output_dir) / input_file_path.name
+    output_fullpath.parent.mkdir(parents=True, exist_ok=True)
+    os.rename(input_file_path, output_fullpath)
+
+
+def run_parsing(
+    input_files:List[str],
+    output_dirname: str,
+    lang: str,
+    my_size: float,
+    depparse_only: bool
+    ) -> None:
+    '''
+    Parse files with Stanza
+    Inputs:
+        input_files (List[str]) : a list of files to process
+        output_dirname: str : name of the folder in which to export files
+        lang (str) : a 2-3 character language code
+        my_size (int) : an integer used to define batch sizes
+        depparse_only (bool) : Run dependency parsing only.
+            If True or T, only the dependency parser will be called. For processing
+            to be successful, input data needs to be well-formatted conll with at
+            least POS, LEM annotations present.
+    '''
+
+    if not input_files:
+        print("No input files found")
+        sys.exit(0)
+
+    # check we have files to process
+    print(f'{len(input_files)} files found')
+    # instantiate the nlp object and print batch sizes to the console
+
+    nlp, batch_sizes_tidy, parse_settings_dict = prepare_for_parsing(
+        input_files,
+        output_dirname,
+        lang,
+        my_size,
+        depparse_only
+        )
+
+    for input_file in tqdm(input_files):
+        try:
+            ## load input file and check that longest sent is under the set limit
+            starttime = time.time()
+            source_doc = CoNLL.conll2doc(input_file)
+            max_len = max(len(sent.tokens) for sent in source_doc.sentences)
+
+            if max_len >= parse_settings_dict.get('limit'):
+                write_log(
+                    parse_settings_dict.get('log_file_path'),
+                    str(f'\tSkipping {input_file} : max_len exceeded:: {max_len}\n')
+                    )
+
+            else:
+                ## print the number of tokens in the doc, run pipeline, export
+                print(f"\tProcessing {input_file} :: {source_doc.num_tokens} tokens")
+                annotated_document = nlp(source_doc)
+                write_annotations_to_file(
+                    annotated_document,
+                    input_file,
+                    parse_settings_dict
+                    )
+
+                move_processed_source(input_file, parse_settings_dict)
+                ## make reportstring, write to log
+                write_log(
+                    parse_settings_dict.get('log_file_path'),
+                    log_entry = (
+                        f"{starttime}\t"
+                        f"{time.time()}\t"
+                        f"{source_doc.num_tokens}\t"
+                        f"{input_file}\t"
+                        f"{batch_sizes_tidy}\n"
+                        )
+                    )
+        # quietly catch and log all exceptions
+        except Exception as e:
+            report_string = f'{input_file}\t{e}\n'
+            print(report_string)
+            write_log(parse_settings_dict.get('log_file_path'), str(report_string))
+
+def write_log(log_file_path, log_entry):
+    '''
+    Simple helper to write-append a log entry to the logfile
+    Inputs:
+        log_entry : str : the string to write to the logfile
+        launch_time : int : unix time at which the parsing process was launched
+    Returns:
+        no return object : a string is write-appended to a file
+    '''
+    with open(log_file_path ,'a', encoding='UTF-8') as k:
+        _ = k.write(log_entry)
+
+
+def get_input_files(input_args: argparse.Namespace) -> List[str]:
+    """
+    Retrieves a sorted list of .conll and .conllu files from the target directory.
+
+    This function constructs the correct directory path based on the provided
+    base directory and optional subfolder name, then gathers all files
+    matching the .conll or .conllu extensions.
+
+    Args:
+        input_args (argparse.Namespace): The parsed arguments object containing
+            'source_dir' (str) and 'subf' (str).
+
+    Returns:
+        List[str]: A sorted list of paths to the matched files.
+    """
+    # Convert source_dir to a Path object for robust path manipulation
+    source_dir = Path(input_args.source_dir)
+
+    # Construct target directory: source_dir/subf if subf is provided, else source_dir
+    search_dir = source_dir / input_args.subf if input_args.subf else source_dir
+
+    # Check if the directory actually exists to avoid errors
+    if not search_dir.exists():
+        print(f"⚠️ Warning: Directory not found: {search_dir}")
+        return []
+
+    # Search for both extensions in one go using a list comprehension
+    # This gathers all files matching either *.conll or *.conllu
+    input_files = [
+        str(f) for ext in ["*.conll", "*.conllu"]
+        for f in search_dir.glob(ext)
+    ]
+
+    return sorted(input_files)
 
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description="parse conllised texts with LANGUAGE and specified batch SIZE")
-	parser.add_argument("-size",help="integer value for size of batch : x for all except pos_batch_max_tokens == 16x" )
-	parser.add_argument("-lang",help="language : use two/three letter codes that Stanza expects" )
-	parser.add_argument("-depparseOnly",help="Run dependency parsing only" )
-	parser.add_argument("--subf",help="path to subfolder to process",default='' )
-	args = parser.parse_args()
-	subf_name = args.subf
-	if subf_name == '':
-		input_files = sorted(glob.glob(f'/home/username/tag_input/*.conll'))
-		if len(input_files) ==0:
-			input_files = sorted(glob.glob(f'/home/username/tag_input/*.conllu'))
-	if subf_name != '':
-		input_files = sorted(glob.glob(f'/home/username/tag_input/{subf_name}/*.conll'))
-		if len(input_files) ==0:
-			input_files = sorted(glob.glob(f'/home/username/tag_input/{subf_name}/*.conllu'))
-	my_size = str(args.size)
-	lang = args.lang
-	depparseOnly = args.depparseOnly
-	run_parsing(input_files, lang, my_size, depparseOnly)
+    parser = argparse.ArgumentParser(
+        description="parse conllised texts with LANGUAGE and specified batch SIZE"
+        )
+    parser.add_argument(
+        "--source_dir",
+        help="Path to source dir"
+        )
+    parser.add_argument(
+        "--output_dirname",
+        help="Name of the output dir"
+        )
+    parser.add_argument(
+        "--size",
+        help="integer value for size of batch : x for all except pos_batch_max_tokens == 16x"
+        )
+    parser.add_argument(
+        "--lang",
+        help="language : use two/three letter codes that Stanza expects"
+        )
+    parser.add_argument(
+        "--depparse_only",
+        action="store_true",
+        required=False,
+        help="Run dependency parsing only"
+        )
+    parser.add_argument(
+        "--subf",
+        type=str,
+        required=False,
+        help="path to subfolder to process",
+        default=''
+        )
+
+    args = parser.parse_args()
+    arg_input_files = get_input_files(args)
+    run_parsing(
+        arg_input_files,
+        args.output_dirname,
+        args.lang,
+        str(args.size),
+        args.depparse_only)
