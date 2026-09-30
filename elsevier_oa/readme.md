@@ -145,7 +145,8 @@ A CLI helper to compress files/folders for archival or remote transfer.
 *   **Individual Mode** (`--mode indiv`): Compresses every file into its own zip file (parallelized via `--n_procs`).
 *   **Subfolder Mode** (`--mode subfolder`): Zips files with a specific extension into their respective subfolders (ideal for feeding files to a GPU server).
 **Example Usage:**
+Zip all files in `/scratch/data/folder1` with the xml extension to individual zips, using 6 workers
 ```bash
-python zip_here.py --folder /Volumes/scratch/data/folder1 --savename squashedStuff --extension xml --n_procs 6 --mode indiv
+python zip_here.py --folder /scratch/data/folder1 --extension xml --n_procs 6 --mode indiv
 ```
   
