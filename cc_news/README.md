@@ -68,7 +68,7 @@ python make_conll.py -year 2017 -filter_type domain -filter_value lemonde.fr --n
 
 ### 3. NLP Annotation and Dependency Parsing
 
-This script performs deep linguistic analysis on the processed CoNLLU files using the **Stanza** NLP library, adding POS tags, lemmas, and syntactic dependencies.
+This script performs linguistic analysis on the processed CoNLLU files using the **Stanza** NLP library, adding POS tags, lemmas, and syntactic dependencies.
 
 #### Key Features:
 *   **Language-Specific Pipelines**: Dynamically loads a Stanza pipeline for target languages (English, French, German, Italian, Spanish, etc.).
@@ -84,9 +84,9 @@ This script performs deep linguistic analysis on the processed CoNLLU files usin
 4.  **Serialization**: Writes the final annotated objects back to the filesystem as structured CoNLL files.
 
 #### Example Usage:
-To run the French dependency parser with a batch size multiplier of 1.5:
+To run the French dependency parser with a batch size multiplier of 1.5, using run_stanza.py from the common module
 ```bash
-python parse_conll.py -lang fr -size 1.0 
+python -m common.run_stanza -lang fr -size 1.0 
 ```
 
 **Argument Reference:**
