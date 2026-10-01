@@ -491,7 +491,7 @@ if __name__ == "__main__":
     Usage :
       example : process files in /home/folder with 4 processors in pool, 
       joining hyphens set to True, for files in French
-      tokeniser.py -input_path /home/folder --nprocs 4 -join_hyphen True --lang fr
+      tokeniser.py -input_path /home/folder --workers 4 -join_hyphen True --lang fr
 
     ''')
     parser.add_argument(
@@ -501,7 +501,7 @@ if __name__ == "__main__":
         "--output_path", type=str,help="output folder toplevel"
     )
     parser.add_argument(
-        "--nprocs", type=int, default=2,
+        "--workers", type=int, default=2,
         help="Number of worker processes to use"
     )
     parser.add_argument(
@@ -523,12 +523,12 @@ if __name__ == "__main__":
     tokeniser_processing_config = TokeniserProcessingConfig(
         path = args.input_path,
         output_path = args.output_path,
-        n_procs = args.nprocs,
+        n_procs = args.workers,
         lang = args.lang,
         hyphen_join_value = args.join_hyphen,
         no_write = args.no_write,
         files = files
         )
-    print(f'{len(files)} files found : processing with {args.nprocs} workers')
+    print(f'{len(files)} files found : processing with {args.workers} workers')
 
     pool_tokenise(tokeniser_processing_config)
