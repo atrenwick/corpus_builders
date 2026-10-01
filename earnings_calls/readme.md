@@ -1,11 +1,7 @@
-Creating an XML corpus of tagged, parsed English language financial earnings calls
-
-This project provides a multi-stage pipeline for processing earnings call transcripts. It automates the workflow from downloading raw data from Hugging Face to generating structured TEI XML corpora.
-
-# Earnings Call Corpus Pipeline
+# Earnings Calls: Creating an XML corpus of tagged, parsed English language financial earnings calls
 
 ## 📋 Project Overview
-This pipeline transforms existing datasets of earnings calls into XML-TEI files of a specific structure. The process involves foud main stages:
+This pipeline transforms an existing dataset of earnings calls into XML-TEI files of a specific structure. The process involves foud main stages:
 1.  **Data Acquisition**: Downloading `.parquet` files from Hugging Face.
 2.  **Preprocessing**: Sentencizing, tokenizing, transcripts, identifying speakers, and formatting them into CoNLL format.
 3.  **Parsing with Stanza**: Parsing the files with Stanza to add POS tags, lemmas, morphological features and syntactic dependencies.
