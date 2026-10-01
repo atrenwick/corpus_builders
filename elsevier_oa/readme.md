@@ -61,7 +61,7 @@ python -m .common.custom_tokenizer --inputPath /data/elsevier_oa/data_step1 --ou
 ```
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
-*   `--nprocs`: Number of worker processes to request (limited by CPU cores and file count).
+*   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--lang`: Language for rules (e.g., `en` for English).
 
 ---
@@ -79,7 +79,7 @@ python -m .common.custom_sentenciser --source_dir /data/elsevier_oa/data_step2 -
 ```
 *   `--source_dir`: Path to folder containing tokenised XML files.
 *   `--output_dir`: Path to folder where sentencized XML files will be exported.
-*   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
+*   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--lang`: Language for rules (e.g., `en` for English).
 *   `--chunksize`: Number of files each worker should read in a single batch.
 *   `--offset`: Number from which sentences should be numbered
@@ -96,7 +96,7 @@ python step6_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_di
 *   `--xml_dirname`: The *name* (not path) of the folder containing the sentencised XML.
 *   `--xml_output`: The *name* (not path) of the folder where files will be exported.
 *   `--id_attrib`: XML attribute of `<s>` elements containing sentence IDs : (eg `s_id`, `sID`, `id`, `send_id`...)
-*   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
+*   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
 
 ---
@@ -131,7 +131,7 @@ python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /
 *   `--output`: Path to the folder where output XML files will be exported.
 *   `--issn`: Path to the ISSN-title-subject dictionary.
 *   `--artmetas`: Path to the article-level metadata dictionary.
-*   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
+*   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
 *   `--extension`: Process only files with this file extension (without leading `.`) 
 ---
@@ -153,7 +153,7 @@ python step9_consolidate_treess.py --searchdir /data/elsevier_oa/data_step6 --me
 A CLI helper to compress files/folders for archival or remote transfer.
 
 *   **Monolithic Mode** (`--mode mono`): Compresses a folder into a single zip.
-*   **Individual Mode** (`--mode indiv`): Compresses every file into its own zip file (parallelized via `--n_procs`).
+*   **Individual Mode** (`--mode indiv`): Compresses every file into its own zip file (parallelized via `--workers`).
 *   **Subfolder Mode** (`--mode subfolder`): Zips files with a specific extension into their respective subfolders (ideal for feeding files to a GPU server).
 
 **Example: **
