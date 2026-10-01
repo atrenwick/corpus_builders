@@ -27,7 +27,7 @@ class SentenciserConfiguration:
         mode: Control output detail. 
             Set to dev to XML attribute with rule followed
             attributing EOS position.
-        n_procs: Number of workers to request.
+        workers: Number of workers to request.
         chunksize: Number of files for workers to read in a batch
     """
     source_dir:str
@@ -35,7 +35,7 @@ class SentenciserConfiguration:
     lang: str
     offset: int
     mode: str
-    n_procs: int
+    workers: int
     chunksize: int
 
 
@@ -435,7 +435,7 @@ def run_main(config: SentenciserConfiguration) -> None :
             lang (str): The language code for processing.
             offset (int): The starting number for sentence IDs.
             mode (str): The processing mode (e.g., 'train', 'dev').
-            n_procs (int): The maximum number of processes to use.
+            workers (int): The maximum number of processes to use.
             chunksize (int): The number of tasks to send to each worker in the pool.
 
     Returns:
@@ -459,9 +459,9 @@ def run_main(config: SentenciserConfiguration) -> None :
     )
 
     # Determine a safe size for the processor pool
-    actual_procs = min(config.n_procs, len(input_files), os.cpu_count() or 1)
+    actual_workers = min(config.workers, len(input_files), os.cpu_count() or 1)
 
-    with ProcessPoolExecutor(max_workers=actual_procs) as ex:
+    with ProcessPoolExecutor(max_workers=actual_workers) as ex:
         # Map the processing function to the list of input files
         results = ex.map(safe_worker_function, input_files, chunksize=config.chunksize)
 
@@ -514,7 +514,7 @@ if __name__ == "__main__":
     )
     ## performance
     parser.add_argument(
-        "--n_procs",
+        "--workers",
         type=int,
         required=False,
         default=4,
@@ -542,7 +542,7 @@ if __name__ == "__main__":
       lang = args.lang,
       offset = args.offset,
       mode = args.mode,
-      n_procs = args.n_procs,
+      workers = args.workers,
       chunksize = args.chunksize
       )
 
