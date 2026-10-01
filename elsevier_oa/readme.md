@@ -13,20 +13,20 @@ The archive is ≈ 970 MB ; when uncompressed, the json source files are around 
 
 ## 📋 Pipeline Overview
 The processing follows this sequence:
-1. **Move/Chunking**: `1_elsevier_mover.py`
-2. **JSON to XML**: `2_json_to_xml.py`
-3. **Tokenisation**: `3_tokeniser.py`
-4. **Sentencisation**: `4_sentenciser.py`
-5. **Re-insertion**: `5_reinsert.py`
-6. **Easiest step**: Go to step 7. 
-7. **Metadata Querying**: `7_issn_querying.py`
-8. **Tree Update**: `8_update_trees.py`
-
+1. **Move/Chunking**: `step1_elsevier_mover.py`
+2. **JSON to XML**: `step2_json_to_xml.py`
+3. **Tokenisation**: `.common.custom_tokeniser`
+4. **Sentencisation**: `.common.custom_sentenciser`
+5. **Parsing**: `.common.run_stanza` 
+6. **Re-insertion**: `step6_reinsert.py`
+7. **Metadata Querying**: `step7_issn_querying.py`
+8. **Tree Update**: `step8_update_trees.py`
+9. **Consolidate XMLs**: `step9_consolidate_xmls:` 
 ---
 
 ## 🚀 Script Details
 
-### 1. `1_elsevier_mover.py`
+### 1. `step1_elsevier_mover.py`
 **Purpose:** Handles 40,000+ files by chunking them into subfolders. This reduces OS strain, improves file explorer performance, and allows for batch processing.
 
 **Example Usage:**
@@ -40,7 +40,7 @@ python step1_elsevier_mover.py --source /data/elsevier_oa/data_step0 --chunks 10
 
 ---
 
-### 2. `2_json_to_xml.py`
+### 2. `step2_json_to_xml.py`
 **Purpose:** Transforms source JSON documents into TEI-compatible XML. It preserves the text body and hierarchical information.
 
 **Example Usage:**
@@ -52,12 +52,12 @@ python step2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_d
 
 ---
 
-### 3. `3_tokeniser.py`
+### 3. `.common.custom_tokenizer`
 **Purpose:** Performs tokenization on paragraphs, adding a `<w>` element with a unique ID for every token. It handles 'standard' boundaries (spaces/punctuation) and special cases like possessive apostrophes and Latin abbreviations.
 
 **Example Usage:**
 ```bash
-python step3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --lang en
+python -m .common.custom_tokenizer --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --lang en
 ```
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
@@ -66,7 +66,7 @@ python step3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path
 
 ---
 
-### 4. `4_sentenciser.py`
+### 4. `.common.custom_sentenciser`
 **Purpose:** Identifies sentence boundaries. Since paragraphs are reliable anchors, this script labels tokens as "end of sentence" using logical rules (e.g., ignoring periods in "Mr.", "1.2", or "e.g.").
 
 **Outputs:**
@@ -75,7 +75,7 @@ python step3_tokeniser.py --inputPath /data/elsevier_oa/data_step1 --output_path
 
 **Example Usage:**
 ```bash
-python step4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --lang en --offset 314
+python -m .common.custom_sentenciser --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --lang en --offset 314
 ```
 *   `--source_dir`: Path to folder containing tokenised XML files.
 *   `--output_dir`: Path to folder where sentencized XML files will be exported.
@@ -85,12 +85,12 @@ python step4_sentenciser.py --source_dir /data/elsevier_oa/data_step2 --output_d
 *   `--offset`: Number from which sentences should be numbered
 ---
 
-### 5. `5_reinsert.py`
+### 6. `step6_reinsert.py`
 **Purpose:** Takes `.conll` files produced by Stanza and inserts those annotations back into the XML files.
 
 **Example Usage:**
 ```bash
-python step5_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirname data_step3 --xml_output data_step5 --id_attrib s_id --n_procs 4 --sibling
+python step6_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirname data_step3 --xml_output data_step5 --id_attrib s_id --n_procs 4 --sibling
 ```
 *   `--conll_source`: Path to folder containing tagged CoNLL files.
 *   `--xml_dirname`: The *name* (not path) of the folder containing the sentencised XML.
@@ -120,7 +120,7 @@ python step7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay
 
 ---
 
-### 8. `8_update_trees.py`
+### 8. `step8_update_trees.py`
 **Purpose:** Finalizes the individual XML files. It injects the metadata gathered in Script 7 into new `<teiHeader>` elements and groups `<p>` tags into `<div type="...">` elements based on their shared categories.
 
 **Example Usage:**
@@ -134,6 +134,17 @@ python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /
 *   `--n_procs`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
 *   `--extension`: Process only files with this file extension (without leading `.`) 
+---
+
+### 9. `step9_consolidate_trees.py`
+**Purpose:** Make a single XML document combining all the XML files for each ISSN, then move these consolidated XMLs into folders by subject.
+
+**Example Usage:**
+```bash
+python step9_consolidate_treess.py --searchdir /data/elsevier_oa/data_step6/ --metadict /data/elsevier_oa/data_step0/metadata_dict.json
+```
+*   `--searchdir`: Path to the parent of the folder that contains the XMLs made in step8
+*   `--metadict`: Path to the article-level metadata dictionary, as made and used in previous steps.
 ---
 
 ## 🛠 Helper Scripts
