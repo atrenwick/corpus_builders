@@ -5,11 +5,18 @@ import json
 import os
 import sys
 
-from typing import Any, Dict, Tuple, Union
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, Union
+from concurrent.futures import as_completed, ProcessPoolExecutor
+from functools import partial
+
 
 from lxml import etree
 from tqdm import tqdm
+
+
+issn_to_subj_dict: Dict[str, Any] = {}  # Explicitly define at module level
+
 
 
 def prepare_dicts(metas_dict: Union[str, Path]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -34,17 +41,17 @@ def prepare_dicts(metas_dict: Union[str, Path]) -> Tuple[Dict[str, Any], Dict[st
     with open(metadata_dict_as_path, 'r', encoding='UTF-8') as j:
         master_dict = json.load(j)
 
-    issn_to_subj_dict =  {}
+    subj_map =  {}
     for _, topvalue in master_dict.items():
         issn = topvalue.get("journal_issn", "UNK")
-        if issn not in issn_to_subj_dict:
+        if issn not in subj_map:
             # Use ast.literal_eval to safely evaluate the string representation
             # of a list (e.g., "[sub1, sub2]") into an actual Python list.
             subjs = ast.literal_eval(topvalue.get("article_subj", "UNK"))
             subj = subjs[0]
-            issn_to_subj_dict[issn] = subj
+            subj_map[issn] = subj
 
-    return master_dict, issn_to_subj_dict
+    return master_dict, subj_map
 
 def move_to_issn_folders(search_dir: Union[str, Path], master_dict: Dict[str, Any]) -> Path:
     """
@@ -101,10 +108,30 @@ def move_to_issn_folders(search_dir: Union[str, Path], master_dict: Dict[str, An
             newname_as_path = target_dir_path / (key_from_file + ".xml")
             os.rename(file_as_path, newname_as_path)
 
+def init_worker(shared_dict: Dict[str, Any]) -> None:
+    """
+    Initializes worker processes by loading shared_dict into global memory.
+
+    This function is intended to be used as an initializer for a ProcessPoolExecutor. 
+    It loads the issn_to_subj dictionary into the worker's global memory space on
+    process startup. 
+
+    Args:
+        shared_dict (Union[str, Path]): the in-memory dictionary passed to 
+        `process_all_issn_folders`
+
+    Returns:
+        None
+    """
+    global issn_to_subj_dict
+    issn_to_subj_dict = shared_dict
+
+
 
 def process_all_issn_folders(
     search_dir: Union[str, Path],
-    issn_to_subj_dict: Dict[str, Any]
+    subj_map: Dict[str, Any],
+    workers: int
     ) -> None:
     """
     Iterates through all subfolders in the 'issn_level' directory and processes each.
@@ -127,13 +154,63 @@ def process_all_issn_folders(
 
     # Filter for directories only
     issn_folders = [f for f in issn_level_path.iterdir() if f.is_dir()]
+    folder_count = len(issn_folders)
+    ## get number of workers
+    ## define pool
 
-    # Process each folder found
-    for issn_folder in tqdm(issn_folders, desc="Processing ISSN Folders"):
-        process_one_issn_folder(issn_folder, issn_to_subj_dict)
+    # 3. Determine worker count
+    actual_workers = min(workers, folder_count, os.cpu_count() or 1)
+    print(f"Processing using {actual_workers} workers.")
+
+    ## make  safe worker function from safe function
+    safe_worker_function = partial(
+        safely_process_one_issn_folder
+    )
+
+    with ProcessPoolExecutor(
+        max_workers=actual_workers,
+        initializer=init_worker,
+        initargs=(subj_map, )
+    ) as ex:
+
+        future_to_folder = {
+            ex.submit(safe_worker_function, str(f)): f for f in issn_folders
+        }
+
+        # Track results
+        for future in tqdm(as_completed(future_to_folder),
+        total=folder_count, desc="Processing ISSN Folders"):
+            current_folder = future_to_folder[future]
+            try:
+                success, err = future.result()
+                if not success:
+                    tqdm.write(f"Error processing file: {err}")
+            except Exception as e:
+                tqdm.write(f"Critical exception on {current_folder}: {e}")
 
 
-def process_one_issn_folder(issn_folder: Path, issn_to_subj_dict: Dict[str, Any]) -> None:
+def safely_process_one_issn_folder(folder_path: str, **kwargs: Any) -> Tuple[bool, Optional[str]]:
+    """Safely process one folder and catch any exceptions.
+
+    Args:
+        folder_path (str): The folder to be processed.
+        **kwargs (Any): Arbitrary keyword arguments to be passed to 
+            process_one_issn_folder.
+
+    Returns:
+        Tuple[bool, Optional[str]]: A tuple where the first element is a 
+            boolean indicating success (True) or failure (False), and the 
+            second element is an error message string if processing failed, 
+            otherwise None.
+    """
+    try:
+        process_one_issn_folder(folder_path, **kwargs)
+        return True, None
+    except Exception as e:
+        return False, f"{folder_path}: {e}"
+
+
+def process_one_issn_folder(issn_folder: Path, subj_map: Dict[str, Any]) -> None:
     """
     Consolidates all XML files within an ISSN folder into a single TEI corpus
     organized by subject.
@@ -146,7 +223,7 @@ def process_one_issn_folder(issn_folder: Path, issn_to_subj_dict: Dict[str, Any]
     Args:
         issn_folder (Path): The directory path for a specific ISSN
             (e.g., .../issn_level/12345/).
-        issn_to_subj_dict (Dict[str, Any]): A dictionary mapping ISSN strings
+        subj_map (Dict[str, Any]): A dictionary mapping ISSN strings
             to subject strings.
 
     Returns:
@@ -156,7 +233,7 @@ def process_one_issn_folder(issn_folder: Path, issn_to_subj_dict: Dict[str, Any]
     current_issn = issn_folder.name
 
     # Retrieve the subject from our mapping, defaulting to 'UNK'
-    output_subject = issn_to_subj_dict.get(current_issn, 'UNK')
+    output_subject = subj_map.get(current_issn, 'UNK')
 
     # Construct the output path
     output_dir = issn_folder.parent.parent / 'subj_level' / output_subject
@@ -181,7 +258,7 @@ def process_one_issn_folder(issn_folder: Path, issn_to_subj_dict: Dict[str, Any]
 
 
 
-def main(search_dir: str, metas_dict_input_path: str) -> None:
+def main(search_dir: str, metas_dict_input_path: str, workers: int) -> None:
     """
     Orchestrates the end-to-end data processing pipeline.
 
@@ -198,13 +275,13 @@ def main(search_dir: str, metas_dict_input_path: str) -> None:
         None.
     """
     # 1. Prepare dictionaries (loads JSON and builds ISSN -> Subject mappings)
-    master_dict, issn_to_subj_dict = prepare_dicts(metas_dict_input_path)
+    master_dict, subj_map = prepare_dicts(metas_dict_input_path)
 
     # 2. Move files to ISSN folders
     move_to_issn_folders(search_dir, master_dict)
 
     # 3. Process ISSN folders to create subject-level corpora
-    process_all_issn_folders(search_dir, issn_to_subj_dict)
+    process_all_issn_folders(search_dir, subj_map, workers)
 
 
 
@@ -227,9 +304,18 @@ if __name__ == "__main__":
         required=True,
         help="Path to the master metadata.json dict"
     )
+    # Output directory
+    parser.add_argument(
+        "--workers",
+        type=int,
+        required=False,
+        default=4,
+        help="Number of worker processes to request"
+    )
 
     args = parser.parse_args()
     main(
         search_dir=args.searchdir,
-        metas_dict_input_path = args.metadict
+        metas_dict_input_path = args.metadict,
+        workers=args.workers
         )
