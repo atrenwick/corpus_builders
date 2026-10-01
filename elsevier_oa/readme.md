@@ -57,7 +57,7 @@ python step2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_d
 
 **Example Usage:**
 ```bash
-python -m .common.custom_tokenizer --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --nprocs 4 --lang en
+python -m .common.custom_tokenizer --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --workers 4 --lang en
 ```
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
@@ -75,7 +75,7 @@ python -m .common.custom_tokenizer --inputPath /data/elsevier_oa/data_step1 --ou
 
 **Example Usage:**
 ```bash
-python -m .common.custom_sentenciser --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --n_procs 4 --lang en --offset 314
+python -m .common.custom_sentenciser --source_dir /data/elsevier_oa/data_step2 --output_dir /data/elsevier_oa/data_step3 --workers 4 --lang en --offset 314
 ```
 *   `--source_dir`: Path to folder containing tokenised XML files.
 *   `--output_dir`: Path to folder where sentencized XML files will be exported.
@@ -90,7 +90,7 @@ python -m .common.custom_sentenciser --source_dir /data/elsevier_oa/data_step2 -
 
 **Example Usage:**
 ```bash
-python step6_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirname data_step3 --xml_output data_step5 --id_attrib s_id --n_procs 4 --sibling
+python step6_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_dirname data_step3 --xml_output data_step5 --id_attrib s_id --workers 4 --sibling
 ```
 *   `--conll_source`: Path to folder containing tagged CoNLL files.
 *   `--xml_dirname`: The *name* (not path) of the folder containing the sentencised XML.
@@ -125,7 +125,7 @@ python step7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay
 
 **Example Usage:**
 ```bash
-python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /data/elsevier_oa/data_step6 --issn /data/elsevier_oa/data_step0/issn_success_titles.json --artmetas /data/elsevier_oa/data_step0/metadata_dict.json --n_procs 7 --sibling --extension .xml
+python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /data/elsevier_oa/data_step6 --issn /data/elsevier_oa/data_step0/issn_success_titles.json --artmetas /data/elsevier_oa/data_step0/metadata_dict.json --workers 7 --sibling --extension .xml
 ```
 *   `--source`: Path to the folder of XML files to process.
 *   `--output`: Path to the folder where output XML files will be exported.
@@ -159,6 +159,6 @@ A CLI helper to compress files/folders for archival or remote transfer.
 **Example: **
 Zip all files in `/scratch/data/folder1` with the `xml` extension to individual zips, using 6 workers:
 ```bash
-python zip_here.py --folder /scratch/data/folder1 --extension xml --n_procs 6 --mode indiv
+python zip_here.py --folder /scratch/data/folder1 --extension xml --workers 6 --mode indiv
 ```
   
