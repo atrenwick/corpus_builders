@@ -34,7 +34,7 @@ class ProcessingConfig:
     xml_dirname: str
     xml_output_dirname: str
     id_attrib: str
-    n_procs: int
+    workers: int
     sibling: bool
 
 
@@ -315,7 +315,7 @@ def main(config: ProcessingConfig) -> None:
         xml_dirname: Name of the directory for XML inputs.
         xml_output_dirname: Name of the directory for XML outputs.
         id_attrib: The attribute name for ID mapping (e.g., 's_id').
-        n_procs: Max number of processes to use.
+        workers: Max number of processes to use.
         sibling: Whether to search sibling directories for files.
     """
     # 1. Make file list
@@ -337,7 +337,7 @@ def main(config: ProcessingConfig) -> None:
     )
 
     # 3. Determine a safe size for the processor pool
-    actual_procs = min(config.n_procs, file_count, os.cpu_count() or 1)
+    actual_procs = min(config.workers, file_count, os.cpu_count() or 1)
     print(f"Starting pool with {actual_procs} workers.")
 
     # 4. Execution
@@ -372,7 +372,7 @@ if __name__ == "__main__":
         help="attribute of s elements used as id : s, s_id…"
     )
     parser.add_argument(
-        "--n_procs",
+        "--workers",
         help="How many worker processes to request",
         required=False,
         default=2,
@@ -394,7 +394,7 @@ if __name__ == "__main__":
         xml_dirname=args.xml_dirname,
         xml_output_dirname=args.xml_output,
         id_attrib=str(args.id_attrib),
-        n_procs=int(args.n_procs),
+        workers=int(args.workers),
         sibling=bool(args.sibling)
 )
 

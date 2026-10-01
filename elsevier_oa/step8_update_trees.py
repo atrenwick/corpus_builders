@@ -40,7 +40,7 @@ class UpdateTreeProcessingConfig:
     article_metas_dict_file_path: str
     issn_title_dict_file_path: str
     sibling: bool
-    n_procs: int
+    workers: int
     extension: str
 
 
@@ -517,7 +517,7 @@ def main(config: UpdateTreeProcessingConfig) -> None:
     )
 
     # 3. Determine process count
-    actual_procs = min(config.n_procs, file_count, os.cpu_count() or 1)
+    actual_procs = min(config.workers, file_count, os.cpu_count() or 1)
     print(f"Starting pool with {actual_procs} workers.")
 
     # 4. Run the pool
@@ -580,7 +580,7 @@ if __name__ == "__main__":
 
     # Processing options
     parser.add_argument(
-        "--n_procs",
+        "--workers",
         type=int,
         default=2,
         required=False,
@@ -609,7 +609,7 @@ if __name__ == "__main__":
         output_dir=Path(args.output),
         article_metas_dict_file_path=args.artmetas,
         issn_title_dict_file_path=str(args.issn),
-        n_procs=int(args.n_procs),
+        workers=int(args.workers),
         sibling=bool(args.sibling),
         extension=(args.extension)
 
