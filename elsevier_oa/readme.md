@@ -12,7 +12,7 @@ The archive is ≈ 970 MB ; when uncompressed, the json source files are around 
 > **Environment Recommendation:** It is highly recommended to run this in a fresh virtual environment (e.g., `elsevier_env`),
 
 ## 📋 Pipeline Overview
-The processing follows this sequence:
+The processing follows this sequence, using `step`-prefixed scripts from this folder `(elsevier_oa)` and three scripts from `common`, the sibling of this folder
 1. **Move/Chunking**: `step1_elsevier_mover.py`
 2. **JSON to XML**: `step2_json_to_xml.py`
 3. **Tokenisation**: `.common.custom_tokeniser`
@@ -21,7 +21,7 @@ The processing follows this sequence:
 6. **Re-insertion**: `step6_reinsert.py`
 7. **Metadata Querying**: `step7_issn_querying.py`
 8. **Tree Update**: `step8_update_trees.py`
-9. **Consolidate XMLs**: `step9_consolidate_xmls:` 
+9. **Consolidate XMLs**: `step9_consolidate_xmls`
 ---
 
 ## 🚀 Script Details
@@ -141,7 +141,7 @@ python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /
 
 **Example Usage:**
 ```bash
-python step9_consolidate_treess.py --searchdir /data/elsevier_oa/data_step6/ --metadict /data/elsevier_oa/data_step0/metadata_dict.json
+python step9_consolidate_treess.py --searchdir /data/elsevier_oa/data_step6 --metadict /data/elsevier_oa/data_step0/metadata_dict.json
 ```
 *   `--searchdir`: Path to the parent of the folder that contains the XMLs made in step8
 *   `--metadict`: Path to the article-level metadata dictionary, as made and used in previous steps.
