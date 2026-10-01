@@ -14,7 +14,7 @@ from typing import Any, Tuple, List, Optional, Union
 from tqdm import tqdm
 
 ## functions dealing with folders
-def zip_subfolders(input_folder: Path, extension: str, n_procs: int) -> None:
+def zip_subfolders(input_folder: Path, extension: str, workers: int) -> None:
     """Zips all subfolders within a directory in parallel.
 
     Identifies all immediate subdirectories of the input folder and processes
@@ -23,7 +23,7 @@ def zip_subfolders(input_folder: Path, extension: str, n_procs: int) -> None:
     Args:
         input_folder: The Path object of the directory containing folders to zip.
         extension: The file extension to include in the zip (e.g., 'xml').
-        n_procs: The maximum number of parallel processes to use.
+        workers: The maximum number of parallel processes to use.
 
     Returns:
         None
@@ -47,7 +47,7 @@ def zip_subfolders(input_folder: Path, extension: str, n_procs: int) -> None:
     safe_worker_function = partial(safely_process_one_folder, extension=extension)
 
     # Set the number of workers : at least 1, not more than cpu count or number of folders
-    actual_procs = min(n_procs, len(subfolders), os.cpu_count() or 1)
+    actual_procs = min(workers, len(subfolders), os.cpu_count() or 1)
     print(f"Processing {len(subfolders)} folders using {actual_procs} processes...")
 
 
@@ -158,7 +158,7 @@ def process_one_file(file_path: Path, folder_path: Path) -> None:
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zipf:
         zipf.write(file_path, arcname=str(relative_path))
 
-def zip_individually(folder_path: Path, extension: str, n_procs: int) -> None:
+def zip_individually(folder_path: Path, extension: str, workers: int) -> None:
     """Processes all files of a specific extension in a folder in parallel.
 
     Identifies all files matching the extension within the provided directory
@@ -167,7 +167,7 @@ def zip_individually(folder_path: Path, extension: str, n_procs: int) -> None:
     Args:
         folder_path: The Path object of the directory to scan.
         extension: The file extension to filter for (e.g., 'xml').
-        n_procs: The maximum number of parallel processes to use.
+        workers: The maximum number of parallel processes to use.
 
     Returns:
         None
@@ -183,13 +183,13 @@ def zip_individually(folder_path: Path, extension: str, n_procs: int) -> None:
         return
 
     # Determine optimal worker count
-    actual_procs = min(n_procs, len(source_files), os.cpu_count() or 1)
+    actual_workers = min(workers, len(source_files), os.cpu_count() or 1)
 
     # We use partial because ProcessPoolExecutor.map only accepts one argument per task.
     # We "pre-fill" the folder_path so the map only has to pass the file_path.
     worker_func = partial(safely_process_one_file, folder_path=folder_path)
 
-    with ProcessPoolExecutor(max_workers=actual_procs) as executor:
+    with ProcessPoolExecutor(max_workers=actual_workers) as executor:
         # Use list() to force evaluation so tqdm can track the total count
         _ = list(tqdm(
             executor.map(worker_func, source_files),
@@ -273,7 +273,7 @@ if __name__ == "__main__":
         required=True
         )
     parser.add_argument(
-        "--n_procs",
+        "--workers",
         type=int,
         default=2,
         help="Number of processors for the pool"
@@ -290,6 +290,6 @@ if __name__ == "__main__":
     if args.mode == "mono":
         make_monolithic_archive(Path(args.folder), args.extension, args.savename)
     elif args.mode == "subfolder":
-        zip_subfolders(Path(args.folder), args.extension, args.n_procs)
+        zip_subfolders(Path(args.folder), args.extension, args.workers)
     else:
-        zip_individually(Path(args.folder), args.extension, args.n_procs)
+        zip_individually(Path(args.folder), args.extension, args.workers)
