@@ -144,7 +144,7 @@ python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /
 python step9_consolidate_treess.py --searchdir /data/elsevier_oa/data_step6 --metadict /data/elsevier_oa/data_step0/metadata_dict.json
 ```
 *   `--searchdir`: Path to the parent of the folder that contains the XMLs made in step8
-*   `--metadict`: Path to the article-level metadata dictionary, as made and used in previous steps.
+*   `--metadict`: Path to the article-level metadata dictionary, as made in step 7.
 ---
 
 ## 🛠 Helper Scripts
