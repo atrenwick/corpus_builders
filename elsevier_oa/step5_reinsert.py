@@ -300,7 +300,7 @@ def make_tagged_file_lists(conll_source: Union[str, Path], sibling: bool) -> Lis
 
     else:
         # Look for .conll files in the specified dir only
-        tagged_files = sorted(parent_dir.glob("*.conll"))
+        tagged_files = sorted(source_path.glob("*.conll"))
 
     return tagged_files
 
