@@ -57,7 +57,7 @@ python step2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_d
 
 **Example Usage:**
 ```bash
-python -m .common.custom_tokenizer --inputPath /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --workers 4 --lang en
+python -m .common.custom_tokenizer --input_path /data/elsevier_oa/data_step1 --output_path /data/elsevier_oa/data_step2 --workers 4 --lang en
 ```
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
