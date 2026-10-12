@@ -37,8 +37,10 @@ python step1_elsevier_mover.py --source /data/elsevier_oa/data_step0 --chunks 10
 *   `--source`: Path to folder containing 40,000 JSON files.
 *   `--chunks`: Number of files per chunk (default: 1000).
 *   `--extension`: File type to target (default: `json`).
-*   `--verbose`: Prints details of each individual file move.
-Indicative processing speed: 40001 items in 00:08 seconds ≈ 4715.37items/second [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+*   `--verbose`: Prints details of each individual file move.  
+  
+**Indicative processing speed:** 40001 items in 00:08 seconds ≈ 4715.37items/second [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+
 ---
 
 ### 2. `step2_json_to_xml.py`
@@ -49,8 +51,10 @@ Indicative processing speed: 40001 items in 00:08 seconds ≈ 4715.37items/secon
 python step2_json_to_xml.py --source_dir /data/elsevier_oa/data_step0 --output_dir /data/elsevier_oa/data_step1
 ```
 *   `--source_dir`: Path to folder containing the chunked JSON subfolders.
-*   `--output_dir`: Path to the new folder for output XML files (reproduces the folder organization).
-Indicative processing speed: ≈ 3 seconds per folder of 1000 items for 40 folders [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+*   `--output_dir`: Path to the new folder for output XML files (reproduces the folder organization).  
+
+**Indicative processing speed:** ≈ 3 seconds per folder of 1000 items for 40 folders [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+
 ---
 
 ### 3. `.common.custom_tokenizer`
@@ -63,8 +67,9 @@ python -m .common.custom_tokenizer --input_path /data/elsevier_oa/data_step1 --o
 *   `--inputPath`: Path to the folder containing chunked XML files.
 *   `--output_path`: Path for the tokenized XML files.
 *   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
-*   `--lang`: Language for rules (e.g., `en` for English).
-Indicative processing speed: 39999 items in 08:20 ≈ 79.99 items/second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+*   `--lang`: Language for rules (e.g., `en` for English).  
+   
+**Indicative processing speed:** 39999 items in 08:20 ≈ 79.99 items/second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
 
 ---
 
@@ -84,8 +89,10 @@ python -m .common.custom_sentenciser --source_dir /data/elsevier_oa/data_step2 -
 *   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--lang`: Language for rules (e.g., `en` for English).
 *   `--chunksize`: Number of files each worker should read in a single batch.
-*   `--offset`: Number from which sentences should be numbered
-Indicative processing speed: 39999 items in 04:36 ≈ 144.89 items/second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+*   `--offset`: Number from which sentences should be numbered  
+
+**Indicative processing speed:** 39999 items in 04:36 ≈ 144.89 items/second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+
 ---
 
 ### 5. `.common.run_stanza`
@@ -95,9 +102,11 @@ python -m .common.run_stanza --source_dir /data/elsevier_oa/data_step3 --output_
 *   `--source_dir`: Path to folder containing sentencized XML files.
 *   `--output_dirname`: Name of the folder to be created where subfolders will be added mirroring the structure of `source_dir`.
 *   `--lang`: Language to parse (e.g., `en` for English).
-*   `--size`: Customise sizes for Stanza's internal batching
-Indicative processing speed: Depends entirely on the GPU used and its concurrent loads, but on a 48GB NVIDIA graphics card with no concurrent loads, ≈ 150MB of uncompressed CoNLL files processed per hour.
+*   `--size`: Customise sizes for Stanza's internal batching  
+
+**Indicative processing speed:** Depends entirely on the GPU used and its concurrent loads, but on a 48GB NVIDIA graphics card with no concurrent loads, ≈ 150MB of uncompressed CoNLL files processed per hour.
 This step is the fundamental bottleneck in the processing pipeline.
+
 ---
 
 ### 6. `step6_reinsert.py`
@@ -112,8 +121,9 @@ python step6_reinsert.py --conll_source /data/elsevier_oa/data_step4/03 --xml_di
 *   `--xml_output`: The *name* (not path) of the folder where files will be exported.
 *   `--id_attrib`: XML attribute of `<s>` elements containing sentence IDs : (eg `s_id`, `sID`, `id`, `send_id`...)
 *   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
-*   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
-Indicative processing speed: a few seconds per folder of 1000 files.
+*   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.  
+  
+**Indicative processing speed:** a few seconds per folder of 1000 files.
 
 ---
 
@@ -132,8 +142,9 @@ Indicative processing speed: a few seconds per folder of 1000 files.
 python step7_issn_querying.py --json_source /data/elsevier_oa/data_step0 --delay 30 --buffer 10
 ```
 *   `--delay`: Seconds to pause between API calls.
-*   `--buffer`: Number of responses to hold in memory before flushing to disk.
-Indicative processing speed: Depends entirely on the delay set between repeat API calls and the number of calls needed (data from previous runs can be used to avoid redundant repeat queries).
+*   `--buffer`: Number of responses to hold in memory before flushing to disk.  
+   
+**Indicative processing speed:** Depends entirely on the delay set between repeat API calls and the number of calls needed (data from previous runs can be used to avoid redundant repeat queries).
 
 ---
 
@@ -150,8 +161,9 @@ python step8_update_trees.py --source /data/elsevier_oa/data_step5/03 --output /
 *   `--artmetas`: Path to the article-level metadata dictionary.
 *   `--workers`: Number of worker processes to request (limited by CPU cores and file count).
 *   `--sibling`: If enabled, iterates over all sibling folders (e.g., `/01/`, `/02/`, etc.) instead of just the specified source.
-*   `--extension`: Process only files with this file extension (without leading `.`) 
-Indicative processing speed: > 100 files per second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+*   `--extension`: Process only files with this file extension (without leading `.`)  
+
+**Indicative processing speed:** > 100 files per second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
 
 ---
 
@@ -163,8 +175,9 @@ Indicative processing speed: > 100 files per second with 6 workers [2019 iMac (m
 python step9_consolidate_treess.py --searchdir /data/elsevier_oa/data_step6 --metadict /data/elsevier_oa/data_step0/metadata_dict.json
 ```
 *   `--searchdir`: Path to the parent of the folder that contains the XMLs made in step8
-*   `--metadict`: Path to the article-level metadata dictionary, as made in step 7.
-Indicative processing speed: ≈ 1 folder per second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
+*   `--metadict`: Path to the article-level metadata dictionary, as made in step 7.  
+
+**Indicative processing speed:** ≈ 1 folder per second with 6 workers [2019 iMac (macOS Sequoia 15.8.1, python 3.12, working on a USB-C drive)]
 
 ---
 
