@@ -452,7 +452,7 @@ def run_main(config: SentenciserConfiguration) -> None :
     # Bind constant arguments to the worker function using partial
     safe_worker_function = partial(
         safe_process_one_file,
-        output_head_dir=config.output_head_dir,
+        output_head_dir=config.output_dir,
         mode=config.mode,
         lang=config.lang,
         offset=config.offset
