@@ -9,7 +9,8 @@ The archive is ≈ 970 MB ; when uncompressed, the json source files are around 
 
 
 > [!IMPORTANT]
-> **Environment Recommendation:** It is highly recommended to run this in a fresh virtual environment (e.g., `elsevier_env`),
+> **Environment Recommendation:** It is highly recommended to run this in a fresh virtual environment (e.g., `elsevier_env`).
+> **Indexing recommendation** use a directory you've told the OS not to index for search purposes (eg on macOS, tell Spotlight not to index the folder /data/elsevier_oa, so Spotlight doesn't send out metadata workers to try and be helpful as soon as it sees we've made files)
 
 ## 📋 Pipeline Overview
 The processing follows this sequence, using `step`-prefixed scripts from this folder `(elsevier_oa)` and three scripts from `common`, the sibling of this folder
